@@ -11,11 +11,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
+    //Registro Usuario
     private val userDao = AppDatabase.getDatabase(application).userDao()
     private val repository = UserRepository(userDao)
-
     private val _registrationSuccess = MutableStateFlow(false)
     val registrationSuccess: StateFlow<Boolean> = _registrationSuccess
+    //Login Usuario
+    private val _loginSuccess = MutableStateFlow<Boolean?>(null)
+    val loginSuccess: StateFlow<Boolean?> = _loginSuccess
+
 
     fun register(
         name: String,
@@ -29,6 +33,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 _registrationSuccess.value = false
             }
+        }
+    }
+    fun login(email: String, password: String) {
+        viewModelScope.launch {
+            val user = repository.login(email, password)
+            _loginSuccess.value = user != null
         }
     }
 }

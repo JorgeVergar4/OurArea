@@ -5,6 +5,6 @@ import cl.duoc.ourarea.model.UserDao
 
 class UserRepository(private val userDao: UserDao) {
     suspend fun register(user: User) = userDao.insertUser(user)
-    suspend fun login (email: String, password: String) = userDao.getUser(email, password)
     suspend fun userExists(email: String) = userDao.getUserByEmail(email) != null
+    suspend fun login (email: String, password: String) = userDao.getUser(email, password)
 }

@@ -4,8 +4,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.*
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,24 +23,29 @@ import cl.duoc.ourarea.viewmodel.AuthViewModel
 import cl.duoc.ourarea.R
 
 @Composable
-fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
-    onBack: () -> Unit,
+fun LoginScreen(
+    onLoginSuccess: () -> Unit,
+    onGoToRegister: () -> Unit,
     authViewModel: AuthViewModel = viewModel()
 ) {
-    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    val registrationSuccess by authViewModel.registrationSuccess.collectAsState()
+    val loginSuccess by authViewModel.loginSuccess.collectAsState()
+    var showError by remember { mutableStateOf(false) }
+
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xFFF4FBF8)),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF4FBF8)),
         contentAlignment = Alignment.TopCenter
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 32.dp, bottom = 24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(top = 32.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Título grande arriba
             Text(
                 text = "OurAREA",
                 fontWeight = FontWeight.Bold,
@@ -48,41 +54,23 @@ fun RegisterScreen(
                 letterSpacing = 2.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-            // Logo
             Image(
                 painter = painterResource(id = R.drawable.logo),
                 contentDescription = "Logo OurAREA",
-                modifier = Modifier
-                    .size(220.dp)
-                    .padding(bottom = 16.dp)
+                modifier = Modifier.size(180.dp).padding(bottom = 16.dp)
             )
             Text(
-                text = "Descubre y comparte eventos cerca de ti.",
+                text = "Accede para ver eventos cercanos.",
                 color = Color.Gray,
                 fontSize = 16.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 18.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp),
                 textAlign = TextAlign.Center
-            )
-            //Campos de rellenado de datos
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Nombre", color = Color.Gray) },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF19B6B6),
-                    unfocusedBorderColor = Color(0xFFE0E5EA),
-                    focusedLabelColor = Color(0xFF19B6B6)
-                ),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             )
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = {
+                    email = it; showError = false
+                },
                 label = { Text("Correo electrónico", color = Color.Gray) },
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                 singleLine = true,
@@ -96,7 +84,9 @@ fun RegisterScreen(
             )
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = {
+                    password = it; showError = false
+                },
                 label = { Text("Contraseña", color = Color.Gray) },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 visualTransformation = PasswordVisualTransformation(),
@@ -111,20 +101,36 @@ fun RegisterScreen(
             )
             Button(
                 onClick = {
-                    authViewModel.register(name, email, password)
+                    authViewModel.login(email, password)
+                    showError = true
                 },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF19B6B6))
             ) {
-                Text("Crear cuenta", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Continuar", color = Color.White, fontWeight = FontWeight.Bold)
             }
-            TextButton(onClick = { onBack() }) {
-                Text("Volver", color = Color(0xFF19B6B6))
+            TextButton(onClick = { onGoToRegister() }) {
+                Text("¿No tienes cuenta? Regístrate", color = Color(0xFF19B6B6))
             }
-            if (registrationSuccess) {
-                LaunchedEffect(Unit) { onRegisterSuccess() }
-                Text("¡Registro exitoso!", color = Color(0xFF19B6B6), modifier = Modifier.padding(top=20.dp).fillMaxWidth(), textAlign = TextAlign.Center)
+            if (loginSuccess == false && showError) {
+                Text(
+                    "Correo o contraseña incorrectos",
+                    color = Color.Red,
+                    modifier = Modifier.padding(top = 20.dp).fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+            if (loginSuccess == true) {
+                LaunchedEffect(Unit) {
+                    onLoginSuccess()
+                }
+                Text(
+                    "¡Inicio de sesión exitoso!",
+                    color = Color(0xFF19B6B6),
+                    modifier = Modifier.padding(top = 20.dp).fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }

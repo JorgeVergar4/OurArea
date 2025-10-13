@@ -44,13 +44,16 @@ android {
 }
 
 dependencies {
+    //SQLite room
     implementation(libs.androidx.compose.foundation)
     implementation(libs.ads.mobile.sdk)
     val roomVersion = "2.5.2"
-    implementation("androidx.room:room-runtime:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1") //Incorporacion de SQLite room para comenzar el proyecto
-    implementation("androidx.room:room-ktx:2.6.1")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3") // O la versión más reciente
+    implementation("androidx.room:room-runtime:2.8.2")
+    kapt("androidx.room:room-compiler:2.8.2") //Incorporacion de SQLite room para comenzar el proyecto
+    implementation("androidx.room:room-ktx:2.8.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
+    //Navegacion dependencia
+    implementation("androidx.navigation:navigation-compose:2.9.5")// O la versión más reciente
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

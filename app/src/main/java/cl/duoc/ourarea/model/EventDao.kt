@@ -1,9 +1,6 @@
 package cl.duoc.ourarea.model
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
+import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -13,4 +10,16 @@ interface EventDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvents(events: List<Event>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEvent(event: Event)
+
+    @Delete
+    suspend fun deleteEvent(event: Event)
+
+    @Update
+    suspend fun updateEvent(event: Event)
+
+    @Query("DELETE FROM events")
+    suspend fun deleteAllEvents()
 }

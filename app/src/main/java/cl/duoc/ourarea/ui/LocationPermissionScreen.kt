@@ -1,10 +1,10 @@
+package cl.duoc.ourarea.ui
+
 import android.Manifest
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,7 +25,10 @@ fun LocationPermissionScreen(onGranted: () -> Unit) {
     )
 
     if (permissionState.status.isGranted) {
-        onGranted()
+        // Si ya está concedido, notificamos al caller
+        LaunchedEffect(Unit) {
+            onGranted()
+        }
     } else {
         Box(
             modifier = Modifier
@@ -65,8 +68,7 @@ fun LocationPermissionScreen(onGranted: () -> Unit) {
                         color = Color.Gray,
                         fontSize = 16.sp,
                         modifier = Modifier.padding(horizontal = 8.dp),
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.Medium
+                        lineHeight = 20.sp
                     )
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
@@ -82,3 +84,4 @@ fun LocationPermissionScreen(onGranted: () -> Unit) {
         }
     }
 }
+

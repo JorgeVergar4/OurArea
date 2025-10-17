@@ -1,26 +1,30 @@
 package cl.duoc.ourarea.navigation
 
-import LocationPermissionScreen
-import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
+import cl.duoc.ourarea.ui.LocationPermissionScreen
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import cl.duoc.ourarea.ui.EventDetailScreen
 import cl.duoc.ourarea.ui.HomeScreen
 import cl.duoc.ourarea.ui.LoginScreen
 import cl.duoc.ourarea.ui.RegisterScreen
+import cl.duoc.ourarea.viewmodel.EventViewModel
 
 object Routes {
     const val LOGIN = "login"
     const val REGISTER = "register"
     const val PERMISSION = "permission"
     const val HOME = "home"
+    const val EVENT_DETAIL = "event_detail/{eventId}"
 }
 
 @Composable
-fun NavGraph() {
+fun AppNavGraph(eventViewModel: EventViewModel) {
     val navController = rememberNavController()
-    val context = LocalContext.current
 
     NavHost(
         navController = navController,
@@ -42,8 +46,6 @@ fun NavGraph() {
                 onBack = { navController.popBackStack() }
             )
         }
-
-        // Nueva pantalla de permisos de ubicación
         composable(Routes.PERMISSION) {
             LocationPermissionScreen(onGranted = {
                 navController.navigate(Routes.HOME) {
@@ -51,14 +53,28 @@ fun NavGraph() {
                 }
             })
         }
-
         composable(Routes.HOME) {
             HomeScreen(
+                eventViewModel = eventViewModel,
                 onEventDetail = { eventId ->
-                    // Aquí podrías agregar navegación a detalles.
-                    // navController.navigate("event_detail/$eventId")
+                    navController.navigate(Routes.EVENT_DETAIL.replace("{eventId}", eventId.toString()))
                 }
             )
+        }
+        composable(
+            route = Routes.EVENT_DETAIL,
+            arguments = listOf(navArgument("eventId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getInt("eventId")
+            if (eventId != null) {
+                EventDetailScreen(
+                    eventId = eventId,
+                    eventViewModel = eventViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            } else {
+                Text("Evento no encontrado")
+            }
         }
     }
 }

@@ -1,9 +1,10 @@
 package cl.duoc.ourarea.ui
 
-import android.Manifest
 import android.content.Context
 import android.location.Location
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,36 +12,48 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
+import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.wear.compose.material.ChipDefaults
 import coil.compose.AsyncImage
-import com.google.accompanist.permissions.*
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+import java.util.Locale
 import kotlinx.coroutines.suspendCancellableCoroutine
 import cl.duoc.ourarea.viewmodel.EventViewModel
 import cl.duoc.ourarea.model.Event
+import cl.duoc.ourarea.ui.theme.AppColors
 import kotlin.coroutines.resume
+import kotlin.math.max
+import kotlin.math.min
 
-@OptIn(ExperimentalPermissionsApi::class)
+// Paleta de colores
+private val PrimaryTeal = Color(0xFF19B6B6)
+private val DarkTeal = Color(0xFF00796B)
+private val LightTeal = Color(0xFFE0F7FA)
+private val BackgroundGray = Color(0xFFF5F7FA)
+private val CardWhite = Color.White
+private val TextDark = Color(0xFF1A2524)
+private val TextGray = Color(0xFF666666)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     eventViewModel: EventViewModel = viewModel(),
@@ -48,87 +61,88 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     var userLocation by remember { mutableStateOf<Location?>(null) }
-    val events by eventViewModel.events.collectAsState()
-    val permissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
+    var hasLocationPermission by remember { mutableStateOf(false) }
+    val events by eventViewModel.filteredEvents.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf("Todos") }
+    val filters = listOf("Todos", "Hoy", "Este fin", "Gratis", "Familia", "Música", "Comida", "Arte")
 
-    // Solicita permiso y obtiene ubicación
-    LaunchedEffect(permissionState.status) {
-        if (permissionState.status.isGranted && userLocation == null) {
+    // Estado del BottomSheet (altura mínima 200dp, máxima 600dp)
+    var sheetHeight by remember { mutableStateOf(350.dp) }
+    val animatedSheetHeight by animateDpAsState(targetValue = sheetHeight, label = "sheet_height")
+
+    LaunchedEffect(hasLocationPermission) {
+        if (hasLocationPermission && userLocation == null) {
             userLocation = getUserLocation(context)
+            userLocation?.let { eventViewModel.setUserLocation(it) }
         }
     }
 
-    Scaffold(
-        containerColor = Color(0xFFF9FEFD) // Color de fondo general
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            when {
-                // Estado: Permiso denegado
-                !permissionState.status.isGranted -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp)
-                    ) {
-                        Text("Para mostrar eventos cerca de ti, activa el permiso de ubicación.", fontSize = 18.sp, textAlign = TextAlign.Center)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { permissionState.launchPermissionRequest() }) {
-                            Text("Activar ubicación")
-                        }
-                    }
-                }
-                // Estado: Obteniendo ubicación
-                userLocation == null -> {
-                    Column(
-                        Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(16.dp))
-                        Text("Obteniendo tu ubicación...", fontSize = 16.sp)
-                    }
-                }
-                // Estado: Permiso concedido y ubicación obtenida
-                else -> {
-                    val cameraPositionState = rememberCameraPositionState {
-                        position = CameraPosition.fromLatLngZoom(
-                            LatLng(userLocation!!.latitude, userLocation!!.longitude), 14f
-                        )
-                    }
+    LaunchedEffect(searchQuery, selectedFilter) {
+        eventViewModel.applyFilters(searchQuery, selectedFilter)
+    }
 
-                    // Mapa de fondo
-                    GoogleMap(
-                        modifier = Modifier.fillMaxSize(),
-                        cameraPositionState = cameraPositionState,
-                        uiSettings = MapUiSettings(zoomControlsEnabled = false)
-                    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            !hasLocationPermission -> {
+                LocationPermissionScreen(onGranted = { hasLocationPermission = true })
+            }
+            userLocation == null -> {
+                LoadingLocationSection()
+            }
+            else -> {
+                val cameraPositionState = rememberCameraPositionState {
+                    position = CameraPosition.fromLatLngZoom(
+                        LatLng(userLocation!!.latitude, userLocation!!.longitude), 14f
+                    )
+                }
+
+                // Mapa de fondo
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraPositionState,
+                    uiSettings = MapUiSettings(
+                        zoomControlsEnabled = false,
+                        myLocationButtonEnabled = false
+                    )
+                ) {
+                    Marker(
+                        state = remember {MarkerState(position = LatLng(userLocation!!.latitude, userLocation!!.longitude))},
+                        title = "Tu ubicación"
+                    )
+                    events.forEach { event ->
                         Marker(
-                            state = MarkerState(position = LatLng(userLocation!!.latitude, userLocation!!.longitude)),
-                            title = "Tu ubicación"
+                            state = MarkerState(position = LatLng(event.latitude, event.longitude)),
+                            title = event.title,
+                            snippet = event.description,
+                            onInfoWindowClick = { onEventDetail(event.id) }
                         )
-                        events.forEach { event ->
-                            Marker(
-                                state = MarkerState(position = LatLng(event.latitude, event.longitude)),
-                                title = event.title,
-                                snippet = event.description,
-                                onInfoWindowClick = { onEventDetail(event.id) }
-                            )
-                        }
                     }
+                }
 
-                    // Contenido superpuesto (búsqueda y lista)
-                    Column(Modifier.fillMaxSize()) {
-                        TopSection()
-                        Spacer(Modifier.weight(1f))
-                        EventListSection(events = events, onEventClick = onEventDetail)
-                    }
+                // Layout principal con BottomSheet deslizable
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Header flotante
+                    TopSectionCompact(
+                        searchQuery = searchQuery,
+                        onSearchChange = { searchQuery = it },
+                        filters = filters,
+                        selectedFilter = selectedFilter,
+                        onFilterSelect = { selectedFilter = it }
+                    )
+
+                    Spacer(Modifier.weight(1f))
+
+                    // BottomSheet deslizable
+                    DraggableBottomSheet(
+                        height = animatedSheetHeight,
+                        onHeightChange = { delta ->
+                            val newHeight = sheetHeight - delta.dp
+                            sheetHeight = max(200.dp, min(600.dp, newHeight))
+                        },
+                        events = events,
+                        onEventClick = onEventDetail
+                    )
                 }
             }
         }
@@ -136,138 +150,98 @@ fun HomeScreen(
 }
 
 @Composable
-fun TopSection() {
-    Column(
+fun DraggableBottomSheet(
+    height: androidx.compose.ui.unit.Dp,
+    onHeightChange: (Float) -> Unit,
+    events: List<Event>,
+    onEventClick: (Int) -> Unit
+) {
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
+            .height(height)
+            .shadow(16.dp, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        colors = CardDefaults.cardColors(containerColor = CardWhite)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Explorar cerca",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A2524)
-            )
-            Icon(
-                painter = painterResource(id = android.R.drawable.ic_menu_sort_by_size),
-                contentDescription = "Opciones",
-                tint = Color(0xFF008080)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = "",
-                onValueChange = {},
-                placeholder = { Text("Buscar eventos, ferias...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(50),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                )
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = { /* Acción de filtro */ },
+        Column {
+            // Drag handle con detección de gestos
+            Box(
                 modifier = Modifier
-                    .background(Color.White, CircleShape)
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            onHeightChange(dragAmount)
+                        }
+                    }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Tune,
-                    contentDescription = "Filtros",
-                    tint = Color(0xFF008080)
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .background(TextGray.copy(0.3f), RoundedCornerShape(2.dp))
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        val filters = listOf("Hoy", "Este fin", "Gratis", "Familia", "Música")
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(filters) { filter ->
-                FilterChip(
-                    selected = false, // Cambia a tu lógica de selección si lo necesitas
-                    onClick = { /* Acción para el filtro */ },
-                    label = { Text(filter) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color.White,
-                        labelColor = Color(0xFF1A2524)
-                    ),
-                    border = null,
-                    modifier = Modifier.height(36.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun EventListSection(events: List<Event>, onEventClick: (Int) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(Modifier.heightIn(max = 450.dp)) {
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Eventos cerca de ti",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("Eventos cerca de ti", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                    Text("${events.size} eventos encontrados", fontSize = 11.sp, color = TextGray)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.List,
-                        contentDescription = "Vista de lista",
+                        Icons.Default.ViewList,
+                        contentDescription = null,
                         modifier = Modifier
-                            .background(Color(0xFFE0F5F5), CircleShape)
-                            .padding(6.dp),
-                        tint = Color(0xFF008080)
+                            .background(PrimaryTeal, CircleShape)
+                            .padding(6.dp)
+                            .size(18.dp),
+                        tint = Color.White
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Vista de mapa",
-                        tint = Color.Gray
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .background(BackgroundGray, CircleShape)
+                            .padding(6.dp)
+                            .size(18.dp),
+                        tint = TextGray
                     )
                 }
             }
 
+            HorizontalDivider(color = BackgroundGray, thickness = 1.dp)
+
+            // Lista de eventos
             if (events.isEmpty()) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(32.dp).fillMaxWidth()) {
-                    Text("No hay eventos cerca de ti.", fontSize = 16.sp, color = Color.Gray)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.SearchOff, contentDescription = null, modifier = Modifier.size(56.dp), tint = TextGray)
+                        Spacer(Modifier.height(12.dp))
+                        Text("No hay eventos cerca", fontSize = 15.sp, color = TextGray, fontWeight = FontWeight.Medium)
+                    }
                 }
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(events) { event ->
-                        EventCard(event = event, onDetailsClick = { onEventClick(event.id) })
+                    items(events, key = { it.id }) { event ->
+                        CompactEventCard(event = event, onDetailsClick = { onEventClick(event.id) })
                     }
                 }
             }
@@ -276,77 +250,184 @@ fun EventListSection(events: List<Event>, onEventClick: (Int) -> Unit) {
 }
 
 @Composable
-fun EventCard(event: Event, onDetailsClick: () -> Unit) {
+fun TopSectionCompact(
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
+    filters: List<String>,
+    selectedFilter: String,
+    onFilterSelect: (String) -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .shadow(8.dp, RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = CardWhite)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Explorar cerca", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                    Text("Descubre eventos increíbles", fontSize = 12.sp, color = TextGray)
+                }
+                IconButton(
+                    onClick = { /* TODO */ },
+                    modifier = Modifier
+                        .background(LightTeal, CircleShape)
+                        .size(40.dp)
+                ) {
+                    Icon(Icons.Default.Person, contentDescription = "Perfil", tint = DarkTeal)
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchChange,
+                    placeholder = { Text("Buscar eventos...", fontSize = 13.sp, color = TextGray) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = PrimaryTeal) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = BackgroundGray,
+                        unfocusedContainerColor = BackgroundGray,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    singleLine = true
+                )
+                IconButton(
+                    onClick = { /* Filtros */ },
+                    modifier = Modifier
+                        .background(Brush.horizontalGradient(listOf(PrimaryTeal, DarkTeal)), CircleShape)
+                        .size(48.dp)
+                ) {
+                    Icon(Icons.Default.Tune, contentDescription = "Filtros", tint = Color.White)
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(filters) { filter ->
+                    FilterChip(
+                        selected = filter == selectedFilter,
+                        onClick = { onFilterSelect(filter) },
+                        label = { Text(filter, fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = if (filter == selectedFilter) PrimaryTeal else BackgroundGray,
+                            labelColor = if (filter == selectedFilter) Color.White else TextDark,
+                            selectedContainerColor = PrimaryTeal,
+                            selectedLabelColor = Color.White
+                        ),
+                        border = null
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CompactEventCard(event: Event, onDetailsClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(3.dp, RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = CardWhite)
     ) {
         Column {
-            AsyncImage(
-                model = event.image,
-                contentDescription = event.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp),
-                contentScale = ContentScale.Crop,
-                placeholder = painterResource(id = android.R.drawable.ic_menu_gallery), // Placeholder
-                error = painterResource(id = android.R.drawable.ic_menu_report_image) // Error image
-            )
+            Box {
+                AsyncImage(
+                    model = event.image,
+                    contentDescription = event.title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp),
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(android.R.drawable.ic_menu_gallery),
+                    error = painterResource(android.R.drawable.ic_menu_report_image)
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = PrimaryTeal
+                ) {
+                    Text(
+                        event.timeInfo,
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
 
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = event.title,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                Text(event.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark, maxLines = 2)
+                Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocationOn, contentDescription = "Ubicación", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = String.format("%.1f km • %s", event.distance / 1000, event.description.take(20)),
-                        fontSize = 14.sp,
-                        color = Color.Gray,
+                        String.format(Locale.getDefault(), "%.1f km • %s", event.distance / 1000, event.description.take(18)),
+                        fontSize = 12.sp,
+                        color = TextGray,
                         maxLines = 1
                     )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFE0F5F5)
-                    ) {
-                        Text(
-                            text = event.timeInfo,
-                            color = Color(0xFF008080),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = onDetailsClick,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEFFFFF)),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Detalles", color = Color(0xFF008080))
+                        Text("Ver detalles", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
-                    Button(
-                        onClick = { /* TODO: Lógica para guardar evento */ },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEFFFFF)),
-                        shape = RoundedCornerShape(12.dp)
+                    IconButton(
+                        onClick = { /* TODO */ },
+                        modifier = Modifier
+                            .background(LightTeal, RoundedCornerShape(10.dp))
+                            .size(38.dp)
                     ) {
-                        Text("Guardar", color = Color(0xFF008080))
+                        Icon(Icons.Default.BookmarkBorder, contentDescription = "Guardar", tint = DarkTeal)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun LoadingLocationSection() {
+    Box(modifier = Modifier.fillMaxSize().background(BackgroundGray), contentAlignment = Alignment.Center) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = CardWhite),
+            elevation = CardDefaults.cardElevation(8.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Column(modifier = Modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = PrimaryTeal)
+                Spacer(Modifier.height(16.dp))
+                Text("Obteniendo tu ubicación...", fontSize = 15.sp, color = TextDark, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -363,7 +444,7 @@ suspend fun getUserLocation(context: Context): Location? {
                 fusedLocationProviderClient.getCurrentLocation(
                     com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, null
                 )
-                    .addOnSuccessListener { freshLocation -> cont.resume(freshLocation) }
+                    .addOnSuccessListener { cont.resume(it) }
                     .addOnFailureListener { cont.resume(null) }
             }
         }.addOnFailureListener { cont.resume(null) }

@@ -1,0 +1,315 @@
+package cl.duoc.ourarea.viewmodel
+
+import android.app.Application
+import android.location.Location
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import cl.duoc.ourarea.model.Event
+import cl.duoc.ourarea.repository.EventRepository
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import java.io.File
+
+class EventViewModel(
+    application: Application,
+    private val repository: EventRepository
+) : AndroidViewModel(application) {
+
+    private val _filteredEvents = MutableStateFlow<List<Event>>(emptyList())
+    val filteredEvents: StateFlow<List<Event>> = _filteredEvents
+
+    private val _isLoading = MutableStateFlow(false)
+
+    private var allEvents: List<Event> = emptyList()
+    private var userLocation: Location? = null
+
+    init {
+        loadEvents()
+    }
+
+    private fun loadEvents() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            repository.getAllEvents().collect { events ->
+                allEvents = events
+                updateDistances()
+                _filteredEvents.value = allEvents
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun setUserLocation(location: Location) {
+        userLocation = location
+        updateDistances()
+    }
+
+    fun applyFilters(query: String, filter: String) {
+        var filtered = allEvents
+
+        if (query.isNotBlank()) {
+            filtered = filtered.filter {
+                it.title.contains(query, ignoreCase = true) ||
+                        it.description.contains(query, ignoreCase = true)
+            }
+        }
+
+        if (filter != "Todos") {
+            filtered = when (filter) {
+                "Hoy", "Este fin" -> filtered.filter { it.timeInfo == filter }
+                "Gratis" -> filtered.filter { it.isFree }
+                "Familia" -> filtered.filter { it.isFamily }
+                "Música" -> filtered.filter { it.isMusic }
+                "Comida" -> filtered.filter { it.isFood }
+                "Arte" -> filtered.filter { it.isArt }
+                "Deportes" -> filtered.filter { it.isSports }
+                else -> filtered
+            }
+        }
+
+        _filteredEvents.value = filtered
+    }
+
+    private fun updateDistances() {
+        userLocation?.let { loc ->
+            allEvents = allEvents.map { event ->
+                val results = FloatArray(1)
+                Location.distanceBetween(
+                    loc.latitude, loc.longitude,
+                    event.latitude, event.longitude,
+                    results
+                )
+                event.copy(distance = results[0])
+            }
+            _filteredEvents.value = allEvents
+        }
+    }
+
+    fun insertSampleEventsChile() {
+        viewModelScope.launch {
+            val existingEvents = repository.getAllEvents().firstOrNull() ?: emptyList()
+            if (existingEvents.isEmpty()) {
+                val sampleEvents = getSampleEvents()
+                repository.insertEvents(sampleEvents)
+            }
+        }
+    }
+
+    private fun getSampleEvents(): List<Event> {
+        return listOf(
+            Event(
+                title = "Feria Artesanal en Espacio Vespucio",
+                description = "Artesanía local y productos chilenos cerca del mall.",
+                latitude = -33.5128,
+                longitude = -70.6089,
+                image = "https://www.santiagoturismo.cl/wp-content/uploads/2021/03/foto-interior-8-scaled.jpg",
+                timeInfo = "Hoy",
+                isFree = true,
+                isFamily = true,
+                isMusic = false,
+                isFood = false,
+                isArt = false,
+                isSports = false
+            ),
+            Event(
+                title = "Exposición Cultural DUOC",
+                description = "Muestra de proyectos estudiantiles y actividades culturales.",
+                latitude = -33.4985,
+                longitude = -70.6170,
+                image = "https://media.biobiochile.cl/wp-content/uploads/2024/09/noche-de-museos-750x400.png",
+                timeInfo = "Este fin",
+                isFree = true,
+                isFamily = true,
+                isArt = true,
+                isMusic = false,
+                isFood = false,
+                isSports = false
+            ),
+            Event(
+                title = "Feria Persas del Bio Bio",
+                description = "Feria de ropa, antigüedades y artículos varios cerca de Vicuña Mackenna.",
+                latitude = -33.4850,
+                longitude = -70.6250,
+                image = "https://extension.uc.cl/wp-content/uploads/2024/10/0B0A9047-2-scaled.jpg",
+                timeInfo = "Hoy",
+                isFree = true,
+                isFamily = true,
+                isMusic = false,
+                isFood = false,
+                isArt = false,
+                isSports = false
+            ),
+            Event(
+                title = "Parque O'Higgins - Actividades",
+                description = "Deportes, caminatas y actividades familiares en el parque.",
+                latitude = -33.4678,
+                longitude = -70.6590,
+                image = "https://www.mnba.gob.cl/sites/www.mnba.gob.cl/files/styles/16x9_grande/public/2024-05/IMG_20230321_090820.jpg?h=920929c4&itok=8SBDfQhh",
+                timeInfo = "Hoy",
+                isFree = true,
+                isSports = true,
+                isFamily = true,
+                isMusic = false,
+                isFood = false,
+                isArt = false
+            ),
+            Event(
+                title = "Mercado Lo Valledor",
+                description = "Mercado mayorista con frutas, verduras y gastronomía local.",
+                latitude = -33.4701,
+                longitude = -70.6868,
+                image = "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1a/04/43/f0/wwwvisitsantiagoorg-ubicacion.jpg?w=900&h=500&s=1",
+                timeInfo = "Hoy",
+                isFood = true,
+                isFamily = true,
+                isFree = false,
+                isMusic = false,
+                isArt = false,
+                isSports = false
+            ),
+            Event(
+                title = "Concierto en Plaza San Joaquín",
+                description = "Música en vivo y actividades culturales en la plaza.",
+                latitude = -33.4965,
+                longitude = -70.6180,
+                image = "https://cloudfront-us-east-1.images.arcpublishing.com/copesa/FA44XG7EJZFNVM7AXOFZDT6DCE.jpg",
+                timeInfo = "Este fin",
+                isFree = true,
+                isMusic = true,
+                isFamily = true,
+                isFood = false,
+                isArt = false,
+                isSports = false
+            ),
+            Event(
+                title = "Cine Hoyts Parque Arauco",
+                description = "Estrenos de cine internacional y nacional.",
+                latitude = -33.4032,
+                longitude = -70.5676,
+                image = "https://offloadmedia.feverup.com/santiagosecreto.com/wp-content/uploads/2023/09/25102131/3-1-17.jpg",
+                timeInfo = "Hoy",
+                isFree = false,
+                isFamily = true,
+                isMusic = false,
+                isFood = false,
+                isArt = false,
+                isSports = false
+            ),
+            Event(
+                title = "Torneo de Fútbol Infantil",
+                description = "Campeonato de fútbol para niños en Estadio Bicentenario.",
+                latitude = -33.5000,
+                longitude = -70.6111,
+                image = "https://www.portalpuentealto.cl/wp-content/uploads/2024/12/DSC02915-1536x864-1.jpg",
+                timeInfo = "Este fin",
+                isSports = true,
+                isFamily = true,
+                isFree = false,
+                isMusic = false,
+                isFood = false,
+                isArt = false
+            ),
+            Event(
+                title = "Festival de Comida Vegana",
+                description = "Food trucks y stands de comida vegana en Providencia.",
+                latitude = -33.4263,
+                longitude = -70.6092,
+                image = "https://mesadetemporada.com/wp-content/uploads/2020/05/vegana-1.jpg",
+                timeInfo = "Hoy",
+                isFood = true,
+                isFree = false,
+                isFamily = false,
+                isMusic = false,
+                isArt = false,
+                isSports = false
+            ),
+            Event(
+                title = "Exposición de Arte Contemporáneo",
+                description = "Galería de arte con artistas emergentes chilenos.",
+                latitude = -33.4375,
+                longitude = -70.6500,
+                image = "https://www.escueladesarts.com/wp-content/uploads/galerias-de-arte.jpg",
+                timeInfo = "Este fin",
+                isArt = true,
+                isFree = false,
+                isFamily = false,
+                isMusic = false,
+                isFood = false,
+                isSports = false
+            )
+        )
+    }
+
+
+    fun insertEvent(event: Event) {
+        viewModelScope.launch {
+            repository.insertEvent(event)
+        }
+    }
+
+    /**
+     * Elimina un evento y su imagen asociada del almacenamiento interno
+     */
+    fun deleteEvent(event: Event, onSuccess: () -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                // Eliminar archivo de imagen si existe y es una ruta local
+                if (event.image.isNotEmpty() && event.image.startsWith("/")) {
+                    deleteEventImage(event.image)
+                }
+
+                // Eliminar evento de la base de datos
+                repository.deleteEvent(event)
+
+                // Callback de éxito
+                onSuccess()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /**
+     * Elimina el archivo de imagen del almacenamiento interno
+     */
+    private fun deleteEventImage(imagePath: String) {
+        try {
+            val file = File(imagePath)
+            if (file.exists()) {
+                val deleted = file.delete()
+                if (deleted) {
+                    println("Imagen eliminada: $imagePath")
+                } else {
+                    println("No se pudo eliminar la imagen: $imagePath")
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * Verifica si el usuario actual puede eliminar el evento
+     */
+    fun canDeleteEvent(event: Event, currentUserId: Int): Boolean {
+        return event.createdByUserId == currentUserId
+    }
+}
+
+/**
+ * Factory para crear instancias de EventViewModel con Application y Repository
+ */
+class EventViewModelFactory(
+    private val application: Application,
+    private val repository: EventRepository
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(EventViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return EventViewModel(application, repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}

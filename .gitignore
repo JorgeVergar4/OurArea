@@ -1,0 +1,43 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Copilot files - NO SUBIR
+/.idea/copilot*.xml
+
+# API Keys y Secrets - NO SUBIR
+apikeys.properties
+secrets.properties
+google-services.json
+
+# Android Studio files
+/.idea/gradle.xml
+/.idea/dictionaries
+/.idea/vcs.xml
+
+# Build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Log Files
+*.log
+
+# Mac OS
+.DS_Store
+
+# Windows
+Thumbs.db

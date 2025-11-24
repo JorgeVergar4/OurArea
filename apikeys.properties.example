@@ -1,0 +1,8 @@
+# API Keys para OurArea
+# INSTRUCCIONES:
+# 1. Copia este archivo y renómbralo a "apikeys.properties"
+# 2. Reemplaza YOUR_API_KEY_HERE con tu Google Maps API Key real
+# 3. Obtén tu API Key en: https://console.cloud.google.com/apis/credentials
+
+# Google Maps API Key
+MAPS_API_KEY=YOUR_API_KEY_HERE

@@ -1,4 +1,4 @@
-# OurArea
+# OurArea 🌍
 
 <div align="center">
 
@@ -9,196 +9,258 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-### Discover events near you in real-time
+### 📍 Discover and create geolocated events near you
 
-[Features](#features) • [Tech Stack](#tech-stack) • [Installation](#installation) • [API Integration](#api-integration-with-xano) • [Architecture](#architecture)
+**Offline-First Architecture** • **Real-Time Sync** • **Google Maps Integration**
+
+[Features](#-features) • [Tech Stack](#-tech-stack) • [Installation](#-installation) • [API Integration](#-api-integration-xano)
 
 </div>
 
 ---
 
-## Overview
+## 📋 Overview
 
-**OurArea** is a native Android mobile application that enables users to discover, create, and share geolocated events in real-time. The app combines interactive maps with a local database to deliver a smooth, offline-first experience for exploring nearby events.
+**OurArea** is a native Android application that allows users to discover, create, and share geolocated events in real-time. Built with **Jetpack Compose** and **Kotlin**, the app combines interactive maps with an offline-first architecture for a seamless user experience.
 
-The application is designed with **Xano API REST integration** in mind, allowing seamless backend connectivity for cloud synchronization, real-time updates, and multi-device support.
+### ✨ Key Highlights
 
----
-
-## Features
-
-### Core Functionality
-
-- **Secure Authentication**
-  - Login and registration system with PBKDF2 password encryption
-  - Automatic session persistence using DataStore Preferences
-  - Email validation and duplicate prevention
-
-- **Interactive Maps**
-  - Google Maps integration for event visualization
-  - Real-time geolocation with distance calculation
-  - Draggable markers and location picker
-  - Center on user location
-
-- **Event Management**
-  - Create events with images (camera or gallery)
-  - Category-based filtering (Music, Food, Art, Sports, etc.)
-  - Smart search functionality
-  - Event details with navigation to Google Maps
-
-- **Modern UI/UX**
-  - Material Design 3 implementation
-  - Responsive design (portrait and landscape)
-  - Smooth animations and transitions
-  - Custom permission dialogs
-  - Enhanced logout confirmation modal
-
-- **Offline-First Architecture**
-  - Local SQLite database with Room
-  - No internet required for basic functionality
-  - Ready for cloud sync with Xano API
+- 🔄 **Offline-First**: Works without internet, syncs when available
+- 🗺️ **Interactive Maps**: Google Maps integration with real-time geolocation
+- 🔐 **Secure Authentication**: PBKDF2 password encryption + JWT tokens
+- 🎭 **Role-Based Access**: Admin, Moderator, Organizer, and User roles
+- 🌐 **Xano Backend**: Full REST API integration with cloud sync
+- 📱 **Responsive Design**: Optimized for all screen sizes and orientations
 
 ---
 
-## Tech Stack
+## 🚀 Features
 
-### Primary Stack
+### 🔐 User Authentication & Authorization
+- **Secure Login/Register** with email validation
+- **PBKDF2 password encryption** (10,000 iterations, 256-bit keys)
+- **Automatic session persistence** using DataStore Preferences
+- **Role-based permissions** (Admin, Moderator, Organizer, User)
+- **JWT token authentication** with Xano backend
+
+### 🗺️ Interactive Maps
+- **Google Maps integration** for event visualization
+- **Real-time geolocation** with distance calculation
+- **Draggable markers** and custom location picker
+- **Center on user location** button
+- **Marker clustering** for better performance
+
+### 📅 Event Management
+- **Create events** with title, description, location, and categories
+- **Image support** (local storage only - see note below)
+- **Category filtering**: Music, Food, Art, Sports, Family, Free
+- **Smart search** functionality
+- **Event details** with Google Maps navigation
+- **Edit/Delete** events (permission-based)
+
+### 🔄 Offline-First Architecture
+- **Local SQLite database** (Room) for data persistence
+- **Works without internet** - events saved locally first
+- **Automatic background sync** when connection is available
+- **Real-time updates** from Xano API
+- **Conflict resolution** with server-wins strategy
+
+### 🎨 Modern UI/UX
+- **Material Design 3** implementation
+- **Fully responsive** (portrait & landscape)
+- **Smooth animations** and transitions
+- **Custom permission dialogs**
+- **Dark mode ready** (theme system in place)
+
+---
+
+## ⚠️ Important Note: Image Storage Limitation
+
+**The Xano API does NOT support image uploads in the current plan.**
+
+- ✅ Event images are stored **locally on the device**
+- ✅ Events sync to Xano **without images**
+- ❌ Images are **NOT uploaded** to Xano cloud storage
+- ❌ Images will **NOT sync** across multiple devices
+
+**Why?**  
+Xano's free/basic tier does not include file storage capabilities. To enable cloud image storage, you would need:
+1. A Xano paid plan with file storage
+2. Or integrate with a third-party service (AWS S3, Cloudinary, etc.)
+
+**Current behavior:**
+- Images are saved to device's internal storage: `app_dir/files/event_images/`
+- Image paths are stored in the local Room database
+- When syncing to Xano, the `image_url` field is empty or contains the local path (not accessible from other devices)
+
+---
+
+## 🛠️ Tech Stack
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
 | **Kotlin** | 2.0.21 | Programming language |
-| **Jetpack Compose** | 2024.10.00 | Declarative UI framework |
-| **Room Database** | 2.6.1 | Local data persistence |
-| **Coroutines & Flow** | Latest | Asynchronous programming |
+| **Jetpack Compose** | 2024.10.00 | Modern declarative UI |
+| **Room Database** | 2.6.1 | Local SQLite persistence |
+| **Coroutines & Flow** | 1.9.0 | Async programming |
 | **ViewModel** | 2.8.7 | MVVM architecture |
 | **Navigation Compose** | 2.8.3 | Screen navigation |
+| **Retrofit** | 2.9.0 | REST API client |
+| **Xano Backend** | - | Cloud database & API |
 | **Google Maps Compose** | 6.2.1 | Interactive maps |
-| **DataStore Preferences** | 1.1.1 | Preference storage |
-| **Coil** | 2.7.0 | Image loading |
-
-### Additional Dependencies
-
-- **Google Play Services** (Maps, Location): 19.0.0 / 21.3.0
-- **Accompanist Permissions**: 0.34.0
-- **Security Crypto**: 1.1.0-alpha06
-- **Material Icons Extended**: Latest
-- **Retrofit** (for Xano integration): Ready to implement
+| **DataStore** | 1.1.1 | Encrypted preferences |
+| **Coil** | 2.7.0 | Async image loading |
+| **Material3** | Latest | Material Design 3 |
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-OurArea follows the **MVVM (Model-View-ViewModel)** architecture pattern recommended by Google:
+**MVVM (Model-View-ViewModel)** pattern with Clean Architecture principles:
 
 ```
 ┌─────────────────────────────────────┐
-│            UI Layer                 │
-│     (Composables Screens)           │
-│  LoginScreen, HomeScreen, etc.      │
+│         UI Layer (Compose)          │
+│   LoginScreen, HomeScreen, etc.     │
 └──────────────┬──────────────────────┘
-               │
+               │ observes State
                ▼
 ┌─────────────────────────────────────┐
-│        ViewModel Layer              │
-│  AuthViewModel, EventViewModel      │
-│     (Business Logic & State)        │
+│       ViewModel Layer               │
+│   AuthViewModel, EventViewModel     │
+│   (UI State + Business Logic)       │
 └──────────────┬──────────────────────┘
-               │
+               │ calls methods
                ▼
 ┌─────────────────────────────────────┐
-│       Repository Layer              │
+│      Repository Layer               │
 │  UserRepository, EventRepository    │
-│     (Data Source Abstraction)       │
+│   (Data Source Abstraction)         │
 └──────────────┬──────────────────────┘
-               │
+               │ manages
                ▼
-┌─────────────────────────────────────┐
-│         Data Layer                  │
-│  Room DAO (Local) + Xano API (Cloud)│
-│     (Data Persistence)              │
-└─────────────────────────────────────┘
+┌──────────────────┬──────────────────┐
+│   Room (Local)   │  Retrofit (API)  │
+│   SQLite DB      │  Xano Backend    │
+└──────────────────┴──────────────────┘
 ```
 
-This architecture makes it easy to add Xano API integration without modifying existing code.
+### Offline-First Strategy
+1. **Read**: Always from local Room database
+2. **Write**: Save to Room first → Sync to Xano in background
+3. **Sync**: Automatic when internet available
+4. **Conflict**: Server wins (last-write-wins)
 
 ---
 
-## Database Schema
+## 📦 Installation
 
-### Local SQLite (Room)
+### Prerequisites
+- **Android Studio** Ladybug 2024.2.1 or newer
+- **JDK** 17 or higher
+- **Android SDK** 36
+- **Device/Emulator** with Android 7.0+ (API 25+)
 
-**Database Name**: `ourarea_database`
-**Version**: 3
+### Setup Steps
 
-#### Table: `users`
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/JorgeVergar4/OurArea.git
+cd OurArea
+```
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique user ID |
-| name | TEXT | NOT NULL | Full name |
-| email | TEXT | NOT NULL, UNIQUE | Email (login credential) |
-| password | TEXT | NOT NULL | Hashed password (PBKDF2) |
+#### 2. Configure API Keys
+Create `apikeys.properties` in the project root:
 
-**Indexes**: UNIQUE index on `email`
+```bash
+cp apikeys.properties.example apikeys.properties
+```
 
-#### Table: `events`
+Edit and add your keys:
+```properties
+MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
+```
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique event ID |
-| title | TEXT | NOT NULL | Event title |
-| description | TEXT | NOT NULL | Detailed description |
-| latitude | REAL | NOT NULL | Latitude coordinate |
-| longitude | REAL | NOT NULL | Longitude coordinate |
-| image | TEXT | NOT NULL | Local image path |
-| timeInfo | TEXT | NOT NULL | Time info (Today, This weekend) |
-| isFree | INTEGER | NOT NULL | Is free event (0/1) |
-| isFamily | INTEGER | NOT NULL | Family category (0/1) |
-| isMusic | INTEGER | NOT NULL | Music category (0/1) |
-| isFood | INTEGER | NOT NULL | Food category (0/1) |
-| isArt | INTEGER | NOT NULL | Art category (0/1) |
-| isSports | INTEGER | NOT NULL | Sports category (0/1) |
-| distance | REAL | DEFAULT 0 | Calculated distance in meters |
-| createdByUserId | INTEGER | DEFAULT 0 | Creator user ID |
-| createdAt | INTEGER | DEFAULT current_timestamp | Creation timestamp |
+**Get Google Maps API Key:**  
+https://console.cloud.google.com/apis/credentials
+
+⚠️ **Important:** `apikeys.properties` is in `.gitignore` - never commit it!
+
+#### 3. Sync Gradle
+Open the project in Android Studio and wait for automatic Gradle sync.
+
+#### 4. Run the App
+```bash
+./gradlew installDebug
+```
+
+Or click ▶️ Run in Android Studio.
+
+### Build APK for Production
+```bash
+./gradlew assembleRelease
+```
+
+APK location: `app/build/outputs/apk/release/app-release.apk`
 
 ---
 
-## API Integration with Xano
+## 🌐 API Integration (Xano)
 
-### Why Xano?
+**Status:** ✅ **FULLY INTEGRATED & PRODUCTION READY**
 
-[Xano](https://xano.com) is a powerful no-code backend platform that provides:
-- RESTful API generation
-- Database management
-- Authentication & authorization
-- File storage
-- Real-time features
-- Scalable infrastructure
+**Base URL:** `https://x8ki-letl-twmt.n7.xano.io/`
 
-### Xano Setup Guide
+### API Endpoints
 
-#### 1. Create Xano Database Tables
+The app integrates with Xano through two API groups:
 
-Create the following tables in your Xano workspace:
+#### 🔐 Authentication API (`api:p4Kx6qbK`)
+- `POST /auth/signup` - Register new user
+- `POST /auth/login` - Login (returns JWT token)
+- `GET /auth/me` - Get current user info
 
-**Table: `users`**
-```
-- id (int, auto-increment, primary key)
+#### 📅 Events API (`api:8B8nOhtv`)
+- `GET /event` - List all events (with filters)
+- `GET /event/{id}` - Get event by ID
+- `POST /event` - Create new event
+- `PATCH /event/{id}` - Update event
+- `DELETE /event/{id}` - Delete event
+- `GET /event/user/{userId}` - Get user's events
+
+### 📸 Image Storage - Important Limitation
+
+⚠️ **The Xano free/basic plan does NOT support image uploads.**
+
+**Current Implementation:**
+- ✅ Images stored **locally** on device (`app/files/event_images/`)
+- ✅ Events sync to Xano **without images**
+- ❌ Images **NOT uploaded** to cloud
+- ❌ Images **NOT synced** across devices
+
+**To enable cloud image storage, you need:**
+1. **Xano paid plan** with file storage, OR
+2. **Third-party service** (AWS S3, Cloudinary, Firebase Storage)
+
+### Xano Database Schema
+
+**Table: `user`**
+```sql
+- id (int, auto-increment, PK)
 - name (text)
 - email (text, unique)
-- password (text)  // Will store hashed passwords
+- password (text, hashed)
+- role (text, default: "user")
 - created_at (timestamp)
 ```
 
-**Table: `events`**
-```
-- id (int, auto-increment, primary key)
+**Table: `event`**
+```sql
+- id (int, auto-increment, PK)
 - title (text)
 - description (text)
 - latitude (float)
 - longitude (float)
-- image_url (text)  // Xano file storage URL
 - time_info (text)
 - is_free (boolean)
 - is_family (boolean)
@@ -206,392 +268,175 @@ Create the following tables in your Xano workspace:
 - is_food (boolean)
 - is_art (boolean)
 - is_sports (boolean)
-- created_by_user_id (int, foreign key -> users.id)
+- user_id (int, FK -> user.id)
 - created_at (timestamp)
 ```
 
-#### 2. Create Xano API Endpoints
-
-Create the following endpoints in Xano:
-
-**Authentication:**
-- `POST /auth/signup` - Register new user
-- `POST /auth/login` - Login user (returns JWT token)
-- `GET /auth/me` - Get current user info
-
-**Events:**
-- `GET /events` - Get all events (with pagination and filters)
-- `GET /events/{id}` - Get event by ID
-- `POST /events` - Create new event
-- `PATCH /events/{id}` - Update event
-- `DELETE /events/{id}` - Delete event
-
-**File Upload:**
-- `POST /upload` - Upload event image
-
-#### 3. Configure Android App for Xano
-
-Add Retrofit dependencies to `app/build.gradle.kts`:
-
-```kotlin
-dependencies {
-    // Retrofit for API calls
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
-    // Coroutines adapter
-    implementation("com.jakewharton.retrofit:retrofit2-kotlin-coroutines-adapter:0.9.2")
-}
-```
-
-#### 4. Create Xano API Service
-
-Create `app/src/main/java/cl/duoc/ourarea/api/XanoApiService.kt`:
-
-```kotlin
-interface XanoApiService {
-    @POST("auth/signup")
-    suspend fun signup(@Body request: SignupRequest): Response<AuthResponse>
-
-    @POST("auth/login")
-    suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
-
-    @GET("auth/me")
-    suspend fun getCurrentUser(@Header("Authorization") token: String): Response<User>
-
-    @GET("events")
-    suspend fun getEvents(
-        @Query("latitude") lat: Double,
-        @Query("longitude") lng: Double,
-        @Query("radius") radius: Int
-    ): Response<List<Event>>
-
-    @POST("events")
-    suspend fun createEvent(
-        @Header("Authorization") token: String,
-        @Body event: Event
-    ): Response<Event>
-
-    @Multipart
-    @POST("upload")
-    suspend fun uploadImage(
-        @Part image: MultipartBody.Part
-    ): Response<UploadResponse>
-}
-```
-
-#### 5. Update Repository Pattern
-
-Modify repositories to support both local (Room) and remote (Xano) data sources:
-
-```kotlin
-class EventRepository(
-    private val localDataSource: EventDao,
-    private val remoteDataSource: XanoApiService
-) {
-    suspend fun syncEvents() {
-        // Fetch from Xano
-        val remoteEvents = remoteDataSource.getEvents(lat, lng, radius)
-
-        // Update local database
-        localDataSource.insertEvents(remoteEvents.body()!!)
-    }
-
-    suspend fun createEvent(event: Event) {
-        // Save to local DB first (offline-first)
-        localDataSource.insertEvent(event)
-
-        // Try to sync with Xano
-        try {
-            remoteDataSource.createEvent(authToken, event)
-        } catch (e: Exception) {
-            // Mark for later sync
-            // Implement sync queue
-        }
-    }
-}
-```
-
-#### 6. Environment Configuration
-
-Create `apikeys.properties` file:
-
-```properties
-MAPS_API_KEY=your_google_maps_api_key
-XANO_BASE_URL=https://your-workspace.xano.io/api:1
-XANO_API_KEY=your_xano_api_key  # If using API key auth
-```
-
-Update `app/build.gradle.kts`:
-
-```kotlin
-android {
-    defaultConfig {
-        val properties = Properties()
-        properties.load(FileInputStream(rootProject.file("apikeys.properties")))
-
-        buildConfigField("String", "XANO_BASE_URL",
-            "\"${properties.getProperty("XANO_BASE_URL")}\"")
-        buildConfigField("String", "XANO_API_KEY",
-            "\"${properties.getProperty("XANO_API_KEY")}\"")
-    }
-}
-```
-
 ### Sync Strategy
-
-The app implements an **offline-first** strategy:
-
-1. **Read**: Always read from local Room database
-2. **Write**: Save to Room first, then sync to Xano in background
-3. **Sync**: Periodic background sync when internet is available
-4. **Conflict Resolution**: Server wins (last-write-wins strategy)
-
-### Benefits of Xano Integration
-
-- **Multi-device sync**: Access events from any device
-- **Real-time updates**: See new events instantly
-- **Cloud storage**: Images stored in Xano's file system
-- **Scalability**: Handle thousands of users
-- **Analytics**: Track app usage with Xano's built-in analytics
-- **Admin panel**: Manage content through Xano's dashboard
+1. **On App Start:** Fetch all events from Xano → Save to Room
+2. **Create Event:** Save to Room → POST to Xano → Update Room with Xano ID
+3. **Delete Event:** DELETE from Xano → DELETE from Room
+4. **Update Event:** PATCH to Xano → Update Room
 
 ---
 
-## Installation
-
-### Prerequisites
-
-- Android Studio Ladybug | 2024.2.1 or newer
-- JDK 17
-- Android SDK 36
-- Device/Emulator with Android 7.0 (API 25) or higher
-
-### Setup Steps
-
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/JorgeVergar4/OurArea.git
-cd OurArea
-```
-
-2. **Configure Google Maps API Key**
-
-Create `apikeys.properties` file in the project root:
-
-```bash
-cp apikeys.properties.example apikeys.properties
-```
-
-Edit `apikeys.properties` and add your API keys:
-
-```properties
-MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY_HERE
-XANO_BASE_URL=https://your-workspace.xano.io/api:1
-```
-
-Get Google Maps API Key: https://console.cloud.google.com/apis/credentials
-
-**IMPORTANT**: The `apikeys.properties` file is NOT uploaded to GitHub (it's in .gitignore)
-
-3. **Sync Gradle**
-
-Open the project in Android Studio and wait for automatic sync.
-
-4. **Run the application**
-
-```bash
-./gradlew installDebug
-```
-
-Or use the ▶️ Run button in Android Studio.
-
-### Production Build
-
-1. **Update signing config** in `app/build.gradle.kts`:
-
-```kotlin
-signingConfigs {
-    create("release") {
-        storeFile = file("path/to/keystore.jks")
-        storePassword = "your_store_password"
-        keyAlias = "your_key_alias"
-        keyPassword = "your_key_password"
-    }
-}
-```
-
-2. **Build release APK**:
-
-```bash
-./gradlew assembleRelease
-```
-
-The APK will be generated in: `app/build/outputs/apk/release/`
-
----
-
-## Security
+## 🔐 Security
 
 ### Password Encryption
+- **Algorithm:** PBKDF2WithHmacSHA256
+- **Iterations:** 10,000
+- **Key Length:** 256 bits
+- **Salt:** 16 random bytes per password
+- **Format:** `salt:hash` (hexadecimal)
 
-OurArea implements robust password encryption:
-
-- **Algorithm**: PBKDF2WithHmacSHA256
-- **Iterations**: 10,000
-- **Key Length**: 256 bits
-- **Salt**: 16 random bytes per password
-- **Storage Format**: `salt:hash` (hexadecimal)
-
-### Session Persistence
-
-- Encrypted **DataStore Preferences**
-- Secure **session tokens**
-- **Automatic cleanup** on logout
+### Session Management
+- **DataStore Preferences** with encryption
+- **JWT tokens** from Xano
+- **Automatic logout** on token expiry
 
 ### Best Practices
-
-- ✅ Real-time input validation
-- ✅ SQL Injection prevention (Room with safe parameters)
-- ✅ Minimum required permissions
-- ✅ ProGuard/R8 enabled in release builds
-- ✅ API Keys not exposed in code (using BuildConfig)
-- ✅ HTTPS only for API communication
-
----
-
-## Permissions
-
-| Permission | Usage |
-|-----------|-------|
-| `ACCESS_FINE_LOCATION` | Precise user location |
-| `ACCESS_COARSE_LOCATION` | Approximate location (fallback) |
-| `INTERNET` | Load maps and API communication |
-| `CAMERA` | Take photos for events |
-| `READ_EXTERNAL_STORAGE` | Select images from gallery (API < 33) |
-| `READ_MEDIA_IMAGES` | Select images from gallery (API >= 33) |
+- ✅ Input validation & sanitization
+- ✅ SQL injection prevention (Room with safe parameters)
+- ✅ HTTPS-only API communication
+- ✅ ProGuard/R8 in release builds
+- ✅ API keys in `BuildConfig` (not hardcoded)
+- ✅ Minimum permissions requested
 
 ---
 
-## Project Structure
+## 📱 Permissions
+
+| Permission | Usage | Required |
+|-----------|-------|----------|
+| `INTERNET` | API calls & map tiles | ✅ Yes |
+| `ACCESS_FINE_LOCATION` | Precise user location | ✅ Yes |
+| `ACCESS_COARSE_LOCATION` | Approximate location | ⚠️ Fallback |
+| `CAMERA` | Take event photos | 🔵 Optional |
+| `READ_MEDIA_IMAGES` (API 33+) | Gallery access | 🔵 Optional |
+| `READ_EXTERNAL_STORAGE` (API <33) | Gallery access | 🔵 Optional |
+
+---
+
+## 📂 Project Structure
 
 ```
 our/
 ├── app/
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/cl/duoc/ourarea/
-│   │   │   │   ├── MainActivity.kt
-│   │   │   │   ├── data/
-│   │   │   │   │   ├── UserPreferencesManager.kt
-│   │   │   │   │   └── PasswordHasher.kt
-│   │   │   │   ├── model/
-│   │   │   │   │   ├── AppDatabase.kt
-│   │   │   │   │   ├── User.kt
-│   │   │   │   │   ├── Event.kt
-│   │   │   │   │   ├── UserDao.kt
-│   │   │   │   │   └── EventDao.kt
-│   │   │   │   ├── repository/
-│   │   │   │   │   ├── UserRepository.kt
-│   │   │   │   │   └── EventRepository.kt
-│   │   │   │   ├── viewmodel/
-│   │   │   │   │   ├── AuthViewModel.kt
-│   │   │   │   │   └── EventViewModel.kt
-│   │   │   │   └── ui/
-│   │   │   │       ├── AppNavGraph.kt
-│   │   │   │       ├── LoginScreen.kt
-│   │   │   │       ├── RegisterScreen.kt
-│   │   │   │       ├── HomeScreen.kt
-│   │   │   │       ├── AddEventScreen.kt
-│   │   │   │       ├── EventDetailScreen.kt
-│   │   │   │       └── theme/
-│   │   │   ├── res/
-│   │   │   └── AndroidManifest.xml
-│   │   ├── androidTest/
-│   │   └── test/
+│   ├── src/main/java/cl/duoc/ourarea/
+│   │   ├── MainActivity.kt
+│   │   ├── api/
+│   │   │   ├── RetrofitClient.kt
+│   │   │   ├── XanoApiService.kt
+│   │   │   ├── XanoAuthApiService.kt
+│   │   │   └── models/
+│   │   │       ├── ApiModels.kt
+│   │   │       └── ModelMappers.kt
+│   │   ├── data/
+│   │   │   ├── UserPreferencesManager.kt
+│   │   │   └── PasswordHasher.kt
+│   │   ├── model/
+│   │   │   ├── AppDatabase.kt
+│   │   │   ├── User.kt & UserDao.kt
+│   │   │   └── Event.kt & EventDao.kt
+│   │   ├── repository/
+│   │   │   ├── UserRepository.kt
+│   │   │   └── EventRepository.kt
+│   │   ├── viewmodel/
+│   │   │   ├── AuthViewModel.kt
+│   │   │   └── EventViewModel.kt
+│   │   └── ui/
+│   │       ├── AppNavGraph.kt
+│   │       ├── SplashScreen.kt
+│   │       ├── LoginScreen.kt
+│   │       ├── RegisterScreen.kt
+│   │       ├── HomeScreen.kt
+│   │       ├── AddEventScreen.kt
+│   │       ├── EditEventScreen.kt
+│   │       ├── EventDetailScreen.kt
+│   │       └── theme/
 │   ├── build.gradle.kts
 │   └── proguard-rules.pro
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties
+├── apikeys.properties.example
 └── README.md
 ```
 
 ---
 
-## Roadmap
+## 🎯 Roadmap
 
-### Version 1.1.0
-- [ ] Xano API integration
-- [ ] Cloud sync for events
+### Version 1.1.0 (Q1 2025)
+- [ ] Dark mode implementation
+- [ ] Push notifications (Firebase)
 - [ ] Social media sharing
-- [ ] Push notifications
-- [ ] Dark mode
+- [ ] Event QR codes
 
-### Version 1.2.0
-- [ ] Event chat
-- [ ] Attendance confirmation
+### Version 1.2.0 (Q2 2025)
+- [ ] Cloud image storage (AWS S3 or Cloudinary)
+- [ ] Event chat feature
 - [ ] Calendar integration
 - [ ] Export events to PDF
 
-### Version 2.0.0
-- [ ] Real-time updates with WebSockets
-- [ ] Event ratings and reviews
+### Version 2.0.0 (Q3 2025)
+- [ ] Real-time updates (WebSockets)
+- [ ] Event ratings & reviews
 - [ ] Premium events
 - [ ] In-app payments
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! To contribute:
 
-1. Fork the project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'feat: add some amazing feature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'feat: add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
-### Code Style Guidelines
-
-- Follow Kotlin conventions
+### Code Guidelines
+- Follow [Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html)
 - Use Jetpack Compose for UI
-- Document public functions
+- Document public APIs
 - Write unit tests for business logic
-- Follow conventional commits format
+- Use [Conventional Commits](https://www.conventionalcommits.org/)
 
 ---
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 ---
 
-## Contact & Support
+## 👥 Authors & Contact
 
-**Developers**: OurArea Team - Jorge Vergara & Fernando Villalón
-**GitHub**: https://github.com/JorgeVergar4/OurArea
-**Email**: contact@ourarea.app
+**Developers:**  
+- Jorge Vergara - [@JorgeVergar4](https://github.com/JorgeVergar4)  
+- Fernando Villalón
 
-### Report Bugs
+**Project Link:** https://github.com/JorgeVergar4/OurArea  
+**Email:** contact@ourarea.app
 
-To report bugs, please create an issue on GitHub with:
+### Report Issues
+Found a bug? [Create an issue](https://github.com/JorgeVergar4/OurArea/issues) with:
 - Problem description
 - Steps to reproduce
-- Android version
+- Device & Android version
 - Screenshots (if applicable)
 
 ---
 
 <div align="center">
 
-**Built with ❤️ using Jetpack Compose**
+**Built with ❤️ using Jetpack Compose & Kotlin**
 
-[![GitHub](https://img.shields.io/badge/GitHub-OurArea-181717?logo=github)](https://github.com/JorgeVergar4/OurArea)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple?logo=kotlin)](https://kotlinlang.org)
+[![Compose](https://img.shields.io/badge/Jetpack%20Compose-2024.10-blue?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
+[![Xano](https://img.shields.io/badge/Backend-Xano-orange)](https://xano.com)
 
-[⬆ Back to top](#ourarea)
+[⬆ Back to top](#ourarea-)
 
 </div>

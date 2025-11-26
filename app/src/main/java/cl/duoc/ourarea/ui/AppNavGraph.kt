@@ -65,19 +65,34 @@ fun AppNavGraph(
         composable("home") {
             HomeScreen(
                 eventViewModel = eventViewModel,
+                authViewModel = authViewModel,
                 onEventDetail = { eventId -> navController.navigate("detail/$eventId") },
                 onAddEvent = { navController.navigate("add") },
                 onLogout = {
-                    authViewModel.logout()
+                    // Navegar inmediatamente, logout se ejecuta en segundo plano
                     navController.navigate("login") {
                         popUpTo(0) { inclusive = true }
                     }
+                    authViewModel.logout()
                 }
             )
         }
 
         composable("add") {
             AddEventScreen(
+                eventViewModel = eventViewModel,
+                authViewModel = authViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = "edit/{eventId}",
+            arguments = listOf(navArgument("eventId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getInt("eventId") ?: 0
+            EditEventScreen(
+                eventId = eventId,
                 eventViewModel = eventViewModel,
                 authViewModel = authViewModel,
                 onNavigateBack = { navController.popBackStack() }
@@ -93,7 +108,8 @@ fun AppNavGraph(
                 eventId = eventId,
                 eventViewModel = eventViewModel,
                 authViewModel = authViewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToEdit = { id -> navController.navigate("edit/$id") }
             )
         }
     }

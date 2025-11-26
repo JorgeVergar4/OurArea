@@ -59,12 +59,17 @@ fun EventDetailScreen(
     eventId: Int,
     eventViewModel: EventViewModel,
     authViewModel: AuthViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToEdit: (Int) -> Unit = {}  // NUEVO: callback para navegar a edición
 ) {
     val events by eventViewModel.filteredEvents.collectAsState()
     val event = events.find { it.id == eventId }
     val currentUser by authViewModel.currentUser.collectAsState()
     val context = LocalContext.current
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val isLandscape = screenWidth > screenHeight
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -75,31 +80,47 @@ fun EventDetailScreen(
         return
     }
 
-    // Verificar si el usuario actual puede eliminar este evento
-    val canDelete = currentUser?.id == event.createdByUserId
+    // Verificar si el usuario actual puede eliminar/editar este evento
+    val canDelete = currentUser?.canDeleteEvent(event.createdByUserId) == true
 
     Box(Modifier.fillMaxSize().background(AppColors.Background)) {
         Column(Modifier.fillMaxSize()) {
             // Top Bar con botón de eliminar
             TopAppBar(
-                title = { Text("Detalles del Evento", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Text(
+                        "Detalles del Evento",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (isLandscape) 16.sp else 18.sp
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Volver",
-                            tint = AppColors.Primary
+                            tint = AppColors.Primary,
+                            modifier = Modifier.size(if (isLandscape) 20.dp else 24.dp)
                         )
                     }
                 },
                 actions = {
-                    // Botón de eliminar solo visible si el usuario es el creador
+                    // Botón de editar solo visible si el usuario es el creador
                     if (canDelete) {
+                        IconButton(onClick = { onNavigateToEdit(eventId) }) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Editar evento",
+                                tint = AppColors.Primary,
+                                modifier = Modifier.size(if (isLandscape) 20.dp else 24.dp)
+                            )
+                        }
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "Eliminar evento",
-                                tint = MaterialTheme.colorScheme.error
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(if (isLandscape) 20.dp else 24.dp)
                             )
                         }
                     }
@@ -126,78 +147,79 @@ fun EventDetailScreen(
                     contentDescription = event.title,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(250.dp),
+                        .height(if (isLandscape) 180.dp else 250.dp),
                     contentScale = ContentScale.Crop,
                     error = painterResource(android.R.drawable.ic_menu_gallery),
                     placeholder = painterResource(android.R.drawable.ic_menu_gallery)
                 )
 
                 // Contenido del evento
-                Column(Modifier.padding(20.dp)) {
+                Column(Modifier.padding(if (isLandscape) 16.dp else 20.dp)) {
                     // Título
                     Text(
                         text = event.title,
-                        fontSize = 28.sp,
+                        fontSize = if (isLandscape) 22.sp else 28.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.Primary
                     )
 
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(if (isLandscape) 8.dp else 12.dp))
 
                     // Categorías
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        if (event.isFree) CategoryChip("Gratis", AppColors.Secondary)
-                        if (event.isFamily) CategoryChip("Familia", AppColors.GoogleBlue)
-                        if (event.isMusic) CategoryChip("Música", AppColors.GoogleYellow)
-                        if (event.isFood) CategoryChip("Comida", AppColors.GoogleRed)
-                        if (event.isArt) CategoryChip("Arte", AppColors.Primary)
-                        if (event.isSports) CategoryChip("Deportes", AppColors.Secondary)
+                        if (event.isFree) CategoryChip("Gratis", AppColors.Secondary, isLandscape)
+                        if (event.isFamily) CategoryChip("Familia", AppColors.GoogleBlue, isLandscape)
+                        if (event.isMusic) CategoryChip("Música", AppColors.GoogleYellow, isLandscape)
+                        if (event.isFood) CategoryChip("Comida", AppColors.GoogleRed, isLandscape)
+                        if (event.isArt) CategoryChip("Arte", AppColors.Primary, isLandscape)
+                        if (event.isSports) CategoryChip("Deportes", AppColors.Secondary, isLandscape)
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(if (isLandscape) 12.dp else 16.dp))
 
                     // Información básica
-                    InfoRow(Icons.Default.CalendarToday, event.timeInfo)
-                    Spacer(Modifier.height(8.dp))
+                    InfoRow(Icons.Default.CalendarToday, event.timeInfo, isLandscape)
+                    Spacer(Modifier.height(if (isLandscape) 6.dp else 8.dp))
                     InfoRow(
                         Icons.Default.LocationOn,
                         String.format(
                             Locale.getDefault(),
                             "%.1f km de distancia",
                             event.distance / 1000
-                        )
+                        ),
+                        isLandscape
                     )
 
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(if (isLandscape) 16.dp else 20.dp))
 
                     // Descripción
                     Text(
                         text = "Descripción",
-                        fontSize = 20.sp,
+                        fontSize = if (isLandscape) 16.sp else 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextPrimary
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(if (isLandscape) 6.dp else 8.dp))
                     Text(
                         text = event.description,
-                        fontSize = 16.sp,
+                        fontSize = if (isLandscape) 14.sp else 16.sp,
                         color = AppColors.TextSecondary,
-                        lineHeight = 24.sp
+                        lineHeight = if (isLandscape) 20.sp else 24.sp
                     )
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(if (isLandscape) 18.dp else 24.dp))
 
                     // Ubicación
                     Text(
                         text = "Ubicación",
-                        fontSize = 20.sp,
+                        fontSize = if (isLandscape) 16.sp else 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextPrimary
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(if (isLandscape) 8.dp else 12.dp))
 
                     // Mapa de ubicación
                     val cameraPositionState = rememberCameraPositionState {
@@ -209,7 +231,7 @@ fun EventDetailScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp),
+                            .height(if (isLandscape) 150.dp else 200.dp),
                         shape = RoundedCornerShape(12.dp),
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
@@ -316,15 +338,18 @@ fun EventDeleteDialog(  // CAMBIADO AQUÍ
 
 
 @Composable
-fun CategoryChip(text: String, color: Color) {
+fun CategoryChip(text: String, color: Color, isLandscape: Boolean = false) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = color.copy(alpha = 0.1f)
     ) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            fontSize = 12.sp,
+            modifier = Modifier.padding(
+                horizontal = if (isLandscape) 10.dp else 12.dp,
+                vertical = if (isLandscape) 5.dp else 6.dp
+            ),
+            fontSize = if (isLandscape) 11.sp else 12.sp,
             color = color,
             fontWeight = FontWeight.Medium
         )
@@ -332,18 +357,18 @@ fun CategoryChip(text: String, color: Color) {
 }
 
 @Composable
-fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, isLandscape: Boolean = false) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             icon,
             contentDescription = null,
             tint = AppColors.Primary,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(if (isLandscape) 18.dp else 20.dp)
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(if (isLandscape) 6.dp else 8.dp))
         Text(
             text = text,
-            fontSize = 15.sp,
+            fontSize = if (isLandscape) 13.sp else 15.sp,
             color = AppColors.TextSecondary
         )
     }

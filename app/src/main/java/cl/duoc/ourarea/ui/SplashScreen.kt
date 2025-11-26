@@ -14,6 +14,11 @@ import cl.duoc.ourarea.ui.theme.AppColors
 
 @Composable
 fun SplashScreen() {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val isLandscape = screenWidth > screenHeight
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -28,15 +33,15 @@ fun SplashScreen() {
             Image(
                 painter = painterResource(id = R.drawable.logo),
                 contentDescription = "Logo OurArea",
-                modifier = Modifier.size(120.dp)
+                modifier = Modifier.size(if (isLandscape) 90.dp else 120.dp)
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(if (isLandscape) 20.dp else 32.dp))
 
             // Indicador de carga
             CircularProgressIndicator(
                 color = AppColors.Primary,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(if (isLandscape) 32.dp else 40.dp)
             )
         }
     }

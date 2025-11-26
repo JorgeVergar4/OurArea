@@ -42,6 +42,29 @@ class AuthViewModel(
     init {
         // Verificar si hay sesión activa al iniciar
         checkExistingSession()
+        // Sincronizar usuarios de Xano en segundo plano
+        syncUsersFromXano()
+    }
+
+    /**
+     * Sincroniza usuarios desde Xano a la base de datos local
+     * Se ejecuta en segundo plano sin bloquear la UI
+     */
+    private fun syncUsersFromXano() {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("AuthViewModel", "Starting user sync from Xano...")
+                val syncedCount = userRepository.syncUsersFromXano()
+                if (syncedCount != null) {
+                    android.util.Log.d("AuthViewModel", "Successfully synced $syncedCount users from Xano")
+                } else {
+                    android.util.Log.d("AuthViewModel", "User sync failed (possibly offline)")
+                }
+            } catch (e: Exception) {
+                // Silently fail - la app funciona offline
+                android.util.Log.d("AuthViewModel", "User sync error: ${e.message}")
+            }
+        }
     }
 
     /**
@@ -107,75 +130,94 @@ class AuthViewModel(
             _error.value = null
 
             try {
-                // Buscar usuario por email
-                val user = userRepository.getUserByEmail(email)
+                // PRIMERO: Intentar login con Xano API
+                val user = userRepository.loginWithXano(email, password)
 
                 if (user != null) {
-                    // Verificar contraseña con hash
-                    val isPasswordValid = PasswordHasher.verifyPassword(password, user.password)
+                    // Login exitoso con Xano
+                    _currentUser.value = user
+                    _isLoggedIn.value = true
 
-                    if (isPasswordValid) {
-                        _currentUser.value = user
-                        _isLoggedIn.value = true
+                    // Guardar sesión en DataStore
+                    preferencesManager.saveUserSession(
+                        userId = user.id,
+                        name = user.name,
+                        email = user.email
+                    )
 
-                        // Guardar sesión en DataStore
-                        preferencesManager.saveUserSession(
-                            userId = user.id,
-                            name = user.name,
-                            email = user.email
-                        )
-                    } else {
-                        _error.value = "Credenciales incorrectas"
-                    }
+                    android.util.Log.d("AuthViewModel", "Xano login successful: ${user.name}")
                 } else {
-                    _error.value = "Credenciales incorrectas"
+                    // Si falla Xano, intentar login local (fallback offline)
+                    android.util.Log.d("AuthViewModel", "Xano login failed, trying local login for: $email")
+                    val user = userRepository.getUserByEmail(email)
+
+                    if (user != null) {
+                        android.util.Log.d("AuthViewModel", "User found locally: ${user.email}")
+                        // Verificar contraseña con hash
+                        val isPasswordValid = PasswordHasher.verifyPassword(password, user.password)
+
+                        if (isPasswordValid) {
+                            _currentUser.value = user
+                            _isLoggedIn.value = true
+
+                            // Guardar sesión en DataStore
+                            preferencesManager.saveUserSession(
+                                userId = user.id,
+                                name = user.name,
+                                email = user.email
+                            )
+                            android.util.Log.d("AuthViewModel", "Local login successful")
+                        } else {
+                            android.util.Log.e("AuthViewModel", "Password verification failed")
+                            _error.value = "Email o contraseña incorrectos"
+                        }
+                    } else {
+                        android.util.Log.e("AuthViewModel", "User not found locally: $email")
+                        _error.value = "Email o contraseña incorrectos"
+                    }
                 }
             } catch (e: Exception) {
-                _error.value = e.message ?: "Error al iniciar sesión"
+                android.util.Log.e("AuthViewModel", "Login exception: ${e.message}", e)
+                _error.value = "Error de conexión. Verifica tu internet e intenta nuevamente."
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    fun register(name: String, email: String, password: String) {
+    fun register(name: String, email: String, password: String, role: String = "user") {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 
             try {
-                // Verificar si el usuario ya existe
-                val existingUser = userRepository.getUserByEmail(email)
-                if (existingUser != null) {
-                    _error.value = "El email ya está registrado"
-                    _isLoading.value = false
-                    return@launch
-                }
+                // PRIMERO: Intentar registro con Xano API
+                val user = userRepository.signupWithXano(name, email, password, role)
 
-                // Hashear la contraseña
-                val hashedPassword = PasswordHasher.hashPassword(password)
-
-                // Crear nuevo usuario con contraseña hasheada
-                val newUser = User(
-                    email = email,
-                    password = hashedPassword,
-                    name = name
-                )
-
-                val userId = userRepository.insertUser(newUser)
-                if (userId > 0) {
-                    val createdUser = newUser.copy(id = userId.toInt())
-                    _currentUser.value = createdUser
+                if (user != null) {
+                    // Registro exitoso con Xano
+                    _currentUser.value = user
                     _isLoggedIn.value = true
 
                     // Guardar sesión en DataStore
                     preferencesManager.saveUserSession(
-                        userId = createdUser.id,
-                        name = createdUser.name,
-                        email = createdUser.email
+                        userId = user.id,
+                        name = user.name,
+                        email = user.email
                     )
                 } else {
-                    _error.value = "Error al crear la cuenta"
+                    // Si falla Xano, intentar registro local (fallback offline)
+                    // Verificar si el usuario ya existe localmente
+                    val existingUser = userRepository.getUserByEmail(email)
+                    if (existingUser != null) {
+                        _error.value = "El email ya está registrado"
+                        _isLoading.value = false
+                        return@launch
+                    }
+
+                    // Fallback offline no soportado para registro
+                    // Solo se puede registrar en Xano
+                    _error.value = "No se puede registrar sin conexión. Verifica tu internet."
                 }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Error al registrar usuario"
@@ -188,15 +230,25 @@ class AuthViewModel(
     fun logout() {
         viewModelScope.launch {
             try {
-                // Limpiar sesión en DataStore
-                preferencesManager.clearUserSession()
-
-                // Limpiar estado local
+                // Limpiar estado local INMEDIATAMENTE
                 _currentUser.value = null
                 _isLoggedIn.value = false
                 _error.value = null
+                
+                // Limpiar sesión en DataStore
+                preferencesManager.clearUserSession()
+
+                // Cerrar sesión en Xano en segundo plano (no bloqueante)
+                try {
+                    userRepository.logout()
+                } catch (e: Exception) {
+                    // Ignorar errores de logout en Xano
+                }
             } catch (e: Exception) {
-                _error.value = "Error al cerrar sesión"
+                // Incluso si hay error, asegurar que se limpie la sesión
+                _currentUser.value = null
+                _isLoggedIn.value = false
+                _error.value = null
             }
         }
     }

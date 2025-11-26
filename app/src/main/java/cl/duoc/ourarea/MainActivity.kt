@@ -40,10 +40,9 @@ class MainActivity : ComponentActivity() {
                     factory = AuthViewModelFactory(userRepository, preferencesManager)
                 )
 
-                // Cargar eventos de ejemplo al iniciar
-                LaunchedEffect(Unit) {
-                    eventViewModel.insertSampleEventsChile()
-                }
+                // NOTA: Los eventos se sincronizan automáticamente desde Xano
+                // cuando EventViewModel se inicializa (ver EventViewModel.init())
+                // No es necesario insertar eventos de ejemplo aquí
 
                 // Iniciar navegación
                 AppNavGraph(

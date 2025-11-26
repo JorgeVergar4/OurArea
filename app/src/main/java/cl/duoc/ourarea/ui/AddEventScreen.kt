@@ -42,6 +42,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import java.io.FileOutputStream
@@ -58,6 +59,13 @@ fun AddEventScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val isLandscape = screenWidth > screenHeight
+    
     val cameraPermissionState = rememberPermissionState(
         android.Manifest.permission.CAMERA
     )
@@ -71,6 +79,30 @@ fun AddEventScreen(
     val storagePermissionState = rememberPermissionState(storagePermission)
 
     val currentUser by authViewModel.currentUser.collectAsState()  // AGREGADO
+    val error by eventViewModel.error.collectAsState()
+    val syncStatus by eventViewModel.syncStatus.collectAsState()
+    val isLoading by eventViewModel.isLoading.collectAsState()
+
+    // Mostrar mensajes de error y estado
+    LaunchedEffect(error) {
+        error?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Short
+            )
+            eventViewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(syncStatus) {
+        syncStatus?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Short
+            )
+            eventViewModel.clearSyncStatus()
+        }
+    }
 
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -119,6 +151,10 @@ fun AddEventScreen(
         )
         return
     }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
 
     Box(Modifier.fillMaxSize().background(AppColors.Background)) {
         Column(Modifier.fillMaxSize()) {
@@ -381,9 +417,10 @@ fun AddEventScreen(
                     Button(
                         onClick = {
                             selectedLocation?.let { location ->
-                                val permanentImagePath = imageUri?.let { uri ->
-                                    context.saveImageToInternalStorage(uri)
-                                } ?: ""
+                                // Convertir URI a archivo temporal si existe
+                                val imageFile = imageUri?.let { uri ->
+                                    context.uriToFile(uri)
+                                }
 
                                 // Obtener ID del usuario actual
                                 val currentUserId = currentUser?.id ?: 0
@@ -393,7 +430,7 @@ fun AddEventScreen(
                                     description = description,
                                     latitude = location.latitude,
                                     longitude = location.longitude,
-                                    image = permanentImagePath,
+                                    image = imageFile?.absolutePath ?: "",
                                     timeInfo = timeInfo,
                                     isFree = isFree,
                                     isFamily = isFamily,
@@ -403,8 +440,12 @@ fun AddEventScreen(
                                     isSports = isSports,
                                     createdByUserId = currentUserId
                                 )
-                                eventViewModel.insertEvent(newEvent)
-                                onNavigateBack()
+                                
+                                // Pasar el archivo de imagen al ViewModel
+                                eventViewModel.insertEvent(newEvent, imageFile) { createdEvent ->
+                                    // Navegar de vuelta siempre (el evento se guarda localmente aunque falle Xano)
+                                    onNavigateBack()
+                                }
                             }
                         },
                         modifier = Modifier
@@ -412,21 +453,29 @@ fun AddEventScreen(
                             .height(56.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                         shape = RoundedCornerShape(14.dp),
-                        enabled = title.isNotBlank() && description.isNotBlank() && selectedLocation != null,
+                                enabled = title.isNotBlank() && description.isNotBlank() && selectedLocation != null && !isLoading,
                         elevation = ButtonDefaults.buttonElevation(
                             defaultElevation = 6.dp,
                             pressedElevation = 8.dp,
                             disabledElevation = 0.dp
                         )
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                color = AppColors.TextOnPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            "Publicar Evento",
+                            if (isLoading) "Publicando..." else "Publicar Evento",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = AppColors.TextOnPrimary
@@ -597,6 +646,7 @@ fun AddEventScreen(
             )
         }
     }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -753,6 +803,32 @@ fun Context.saveImageToInternalStorage(uri: Uri): String? {
         outputStream.close()
 
         imageFile.absolutePath
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
+fun Context.uriToFile(uri: Uri): File? {
+    return try {
+        val inputStream = contentResolver.openInputStream(uri) ?: return null
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val fileName = "IMG_${timeStamp}.jpg"
+
+        val imagesDir = File(cacheDir, "event_images_temp")
+        if (!imagesDir.exists()) {
+            imagesDir.mkdirs()
+        }
+
+        val imageFile = File(imagesDir, fileName)
+        val outputStream = FileOutputStream(imageFile)
+
+        inputStream.copyTo(outputStream)
+
+        inputStream.close()
+        outputStream.close()
+
+        imageFile
     } catch (e: Exception) {
         e.printStackTrace()
         null

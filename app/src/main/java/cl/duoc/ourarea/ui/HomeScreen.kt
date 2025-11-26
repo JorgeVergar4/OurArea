@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import cl.duoc.ourarea.R
 import cl.duoc.ourarea.model.Event
 import cl.duoc.ourarea.ui.theme.AppColors
+import cl.duoc.ourarea.viewmodel.AuthViewModel
 import cl.duoc.ourarea.viewmodel.EventViewModel
 import coil.compose.AsyncImage
 import com.google.android.gms.location.LocationServices
@@ -54,19 +55,66 @@ private val filters = listOf("Todos", "Hoy", "Este fin", "Gratis", "Familia", "M
 @Composable
 fun HomeScreen(
     eventViewModel: EventViewModel,
+    authViewModel: AuthViewModel,
     onEventDetail: (Int) -> Unit,
     onAddEvent: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val isLandscape = screenWidth > screenHeight
+    
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var hasLocationPermission by remember { mutableStateOf(false) }
     val events by eventViewModel.filteredEvents.collectAsState()
+    val error by eventViewModel.error.collectAsState()
+    val syncStatus by eventViewModel.syncStatus.collectAsState()
+    val currentUser by authViewModel.currentUser.collectAsState()
+    
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("Todos") }
-    var sheetHeight by remember { mutableStateOf(350.dp) }
+
+    // Ajustar altura del sheet basado en tamaño de pantalla
+    val initialSheetHeight = when {
+        isLandscape -> 200.dp
+        screenHeight < 700.dp -> 280.dp  // Pantallas pequeñas
+        screenHeight < 900.dp -> 350.dp  // Pantallas medianas
+        else -> 400.dp  // Pantallas grandes
+    }
+
+    var sheetHeight by remember { mutableStateOf(initialSheetHeight) }
     val animatedSheetHeight by animateDpAsState(sheetHeight, label = "sheet")
     var showLogoutDialog by remember { mutableStateOf(false) }
+
+    // NUEVO: Forzar recarga cuando se vuelve a la pantalla
+    LaunchedEffect(Unit) {
+        eventViewModel.syncEventsFromXano()
+    }
+
+    // Mostrar mensajes de error y estado
+    LaunchedEffect(error) {
+        error?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Short
+            )
+            eventViewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(syncStatus) {
+        syncStatus?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Short
+            )
+            eventViewModel.clearSyncStatus()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -93,39 +141,51 @@ fun HomeScreen(
         eventViewModel.applyFilters(searchQuery, selectedFilter)
     }
 
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
     Box(Modifier.fillMaxSize().background(AppColors.Background)) {
         when {
             !hasLocationPermission -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Card(
-                        modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                        modifier = Modifier
+                            .padding(if (isLandscape) 32.dp else 24.dp)
+                            .fillMaxWidth()
+                            .widthIn(max = 600.dp),
                         shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(AppColors.Surface),
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
                         Column(
-                            Modifier.padding(32.dp),
+                            Modifier.padding(if (isLandscape) 24.dp else 32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Image(
                                 painter = painterResource(id = R.drawable.logo),
                                 contentDescription = "Logo OurArea",
                                 modifier = Modifier
-                                    .size(100.dp)
-                                    .padding(bottom = 8.dp)
+                                    .size(if (isLandscape) 70.dp else 100.dp)
+                                    .padding(bottom = if (isLandscape) 4.dp else 8.dp)
                             )
-                            Spacer(Modifier.height(16.dp))
-                            Text("Permiso de ubicación requerido", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Primary)
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(if (isLandscape) 8.dp else 16.dp))
+                            Text(
+                                "Permiso de ubicación requerido",
+                                fontSize = if (isLandscape) 18.sp else 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AppColors.Primary
+                            )
+                            Spacer(Modifier.height(if (isLandscape) 6.dp else 10.dp))
                             Text(
                                 "Para mostrar eventos cerca de ti, necesitamos acceder a tu ubicación.",
-                                fontSize = 16.sp,
+                                fontSize = if (isLandscape) 14.sp else 16.sp,
                                 color = androidx.compose.ui.graphics.Color.Gray,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                lineHeight = 20.sp,
+                                lineHeight = if (isLandscape) 18.sp else 20.sp,
                                 modifier = Modifier.padding(horizontal = 8.dp)
                             )
-                            Spacer(Modifier.height(24.dp))
+                            Spacer(Modifier.height(if (isLandscape) 16.dp else 24.dp))
                             Button(
                                 onClick = {
                                     permissionLauncher.launch(arrayOf(
@@ -134,7 +194,9 @@ fun HomeScreen(
                                     ))
                                 },
                                 colors = ButtonDefaults.buttonColors(AppColors.Primary),
-                                modifier = Modifier.fillMaxWidth().height(50.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(if (isLandscape) 45.dp else 50.dp),
                                 shape = RoundedCornerShape(14.dp)
                             ) {
                                 Text("Activar ubicación", fontWeight = FontWeight.Bold, color = AppColors.TextOnPrimary)
@@ -186,12 +248,38 @@ fun HomeScreen(
                     )
                 }
 
-                FloatingActionButton(
-                    onClick = onAddEvent,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                    containerColor = AppColors.Primary
-                ) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(24.dp))
+                // Mostrar FAB solo si el usuario puede crear eventos (Responsive)
+                if (currentUser?.canCreateEvents() == true) {
+                    FloatingActionButton(
+                        onClick = onAddEvent,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(
+                                end = when {
+                                    isLandscape -> 24.dp
+                                    else -> 16.dp
+                                },
+                                bottom = when {
+                                    isLandscape -> (sheetHeight + 16.dp)
+                                    screenHeight < 700.dp -> (sheetHeight + 16.dp)
+                                    else -> (sheetHeight + 24.dp)
+                                }
+                            ),
+                        containerColor = AppColors.Primary
+                    ) {
+                        Icon(
+                            Icons.Default.Add, 
+                            contentDescription = "Agregar evento",
+                            tint = AppColors.TextOnPrimary,
+                            modifier = Modifier.size(
+                                when {
+                                    isLandscape -> 22.dp
+                                    screenHeight < 700.dp -> 22.dp
+                                    else -> 24.dp
+                                }
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -209,6 +297,7 @@ fun HomeScreen(
             )
         }
     }
+    }
 }
 
 @Composable
@@ -219,38 +308,119 @@ fun TopBar(
     onFilterSelect: (String) -> Unit,
     onLogout: () -> Unit
 ) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val isSmallScreen = screenHeight < 700.dp
+
     Card(
-        Modifier.fillMaxWidth().padding(16.dp),
-        shape = RoundedCornerShape(16.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(when {
+                isLandscape -> 12.dp
+                isSmallScreen -> 12.dp
+                else -> 16.dp
+            }),
+        shape = RoundedCornerShape(if (isSmallScreen) 12.dp else 16.dp),
         colors = CardDefaults.cardColors(AppColors.MapCardBackground)
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(when {
+            isLandscape -> 12.dp
+            isSmallScreen -> 12.dp
+            else -> 16.dp
+        })) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Column {
-                    Text("Explorar cerca", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
-                    Text("Descubre eventos", fontSize = 14.sp, color = AppColors.TextSecondary)
+                    Text(
+                        "Explorar cerca",
+                        fontSize = when {
+                            isLandscape -> 18.sp
+                            isSmallScreen -> 18.sp
+                            else -> 22.sp
+                        },
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.TextPrimary
+                    )
+                    Text(
+                        "Descubre eventos",
+                        fontSize = when {
+                            isLandscape -> 12.sp
+                            isSmallScreen -> 12.sp
+                            else -> 14.sp
+                        },
+                        color = AppColors.TextSecondary
+                    )
                 }
                 IconButton(onClick = onLogout) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, null, tint = AppColors.Primary)
+                    Icon(
+                        Icons.AutoMirrored.Filled.Logout,
+                        null,
+                        tint = AppColors.Primary,
+                        modifier = Modifier.size(when {
+                            isLandscape -> 20.dp
+                            isSmallScreen -> 20.dp
+                            else -> 24.dp
+                        })
+                    )
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(when {
+                isLandscape -> 8.dp
+                isSmallScreen -> 8.dp
+                else -> 12.dp
+            }))
             OutlinedTextField(
                 value = query,
                 onValueChange = onQueryChange,
-                placeholder = { Text("Buscar eventos...") },
-                leadingIcon = { Icon(Icons.Default.Search, null, tint = AppColors.Primary) },
+                placeholder = { Text("Buscar eventos...", fontSize = when {
+                    isLandscape -> 12.sp
+                    isSmallScreen -> 13.sp
+                    else -> 14.sp
+                }) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        null,
+                        tint = AppColors.Primary,
+                        modifier = Modifier.size(when {
+                            isLandscape -> 18.dp
+                            isSmallScreen -> 18.dp
+                            else -> 20.dp
+                        })
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
+                shape = RoundedCornerShape(10.dp),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = when {
+                    isLandscape -> 12.sp
+                    isSmallScreen -> 13.sp
+                    else -> 14.sp
+                })
             )
-            Spacer(Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(Modifier.height(when {
+                isLandscape -> 6.dp
+                isSmallScreen -> 8.dp
+                else -> 12.dp
+            }))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(when {
+                isLandscape -> 6.dp
+                isSmallScreen -> 6.dp
+                else -> 8.dp
+            })) {
                 items(filters) { f ->
                     FilterChip(
                         selected = f == filter,
                         onClick = { onFilterSelect(f) },
-                        label = { Text(f, fontSize = 12.sp) },
+                        label = { Text(f, fontSize = when {
+                            isLandscape -> 10.sp
+                            isSmallScreen -> 10.sp
+                            else -> 12.sp
+                        }) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = if (f == filter) AppColors.Primary else AppColors.BackgroundGray,
                             labelColor = if (f == filter) AppColors.TextOnPrimary else AppColors.TextPrimary
@@ -418,11 +588,17 @@ fun CompactEventCard(
     onCardClick: () -> Unit,
     onDetailsClick: () -> Unit
 ) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val isSmallScreen = screenHeight < 700.dp
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(3.dp, RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
+            .shadow(3.dp, RoundedCornerShape(if (isSmallScreen) 12.dp else 16.dp)),
+        shape = RoundedCornerShape(if (isSmallScreen) 12.dp else 16.dp),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         onClick = onCardClick
     ) {
@@ -433,42 +609,65 @@ fun CompactEventCard(
                     contentDescription = event.title,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp),
+                        .height(when {
+                            isLandscape -> 100.dp
+                            isSmallScreen -> 120.dp
+                            else -> 140.dp
+                        }),
                     contentScale = ContentScale.Crop,
                     error = painterResource(android.R.drawable.ic_menu_gallery)
                 )
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(10.dp),
-                    shape = RoundedCornerShape(10.dp),
+                        .padding(when {
+                            isLandscape -> 6.dp
+                            isSmallScreen -> 8.dp
+                            else -> 10.dp
+                        }),
+                    shape = RoundedCornerShape(8.dp),
                     color = AppColors.Primary
                 ) {
                     Text(
                         event.timeInfo,
                         color = androidx.compose.ui.graphics.Color.White,
-                        fontSize = 10.sp,
+                        fontSize = when {
+                            isLandscape -> 9.sp
+                            isSmallScreen -> 9.sp
+                            else -> 10.sp
+                        },
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(
+                            horizontal = if (isSmallScreen) 6.dp else 8.dp,
+                            vertical = if (isSmallScreen) 3.dp else 4.dp
+                        )
                     )
                 }
             }
 
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(when {
+                isLandscape -> 10.dp
+                isSmallScreen -> 10.dp
+                else -> 12.dp
+            })) {
                 Text(
                     event.title,
-                    fontSize = 16.sp,
+                    fontSize = when {
+                        isLandscape -> 14.sp
+                        isSmallScreen -> 14.sp
+                        else -> 16.sp
+                    },
                     fontWeight = FontWeight.Bold,
                     color = AppColors.TextPrimary,
-                    maxLines = 2
+                    maxLines = if (isSmallScreen) 1 else 2
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(if (isSmallScreen) 3.dp else 4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.LocationOn,
                         contentDescription = null,
                         tint = AppColors.Primary,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(if (isSmallScreen) 12.dp else 14.dp)
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
@@ -476,25 +675,38 @@ fun CompactEventCard(
                             Locale.getDefault(),
                             "%.1f km • %s",
                             event.distance / 1000,
-                            event.description.take(25) + if (event.description.length > 25) "..." else ""
+                            event.description.take(if (isSmallScreen) 20 else 25) +
+                            if (event.description.length > (if (isSmallScreen) 20 else 25)) "..." else ""
                         ),
-                        fontSize = 12.sp,
+                        fontSize = if (isSmallScreen) 11.sp else 12.sp,
                         color = AppColors.TextSecondary,
                         maxLines = 1
                     )
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(if (isSmallScreen) 6.dp else 10.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = onDetailsClick,
                         modifier = Modifier
                             .weight(1f)
-                            .height(38.dp),
+                            .height(when {
+                                isLandscape -> 34.dp
+                                isSmallScreen -> 36.dp
+                                else -> 38.dp
+                            }),
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Ver detalles", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Ver detalles",
+                            fontSize = when {
+                                isLandscape -> 11.sp
+                                isSmallScreen -> 11.sp
+                                else -> 12.sp
+                            },
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                     IconButton(
                         onClick = { /* TODO: Favoritos */ },
@@ -503,12 +715,13 @@ fun CompactEventCard(
                                 AppColors.Primary.copy(alpha = 0.1f),
                                 RoundedCornerShape(10.dp)
                             )
-                            .size(38.dp)
+                            .size(if (isSmallScreen) 36.dp else 38.dp)
                     ) {
                         Icon(
                             Icons.Default.BookmarkBorder,
                             contentDescription = "Guardar",
-                            tint = AppColors.Primary
+                            tint = AppColors.Primary,
+                            modifier = Modifier.size(if (isSmallScreen) 18.dp else 20.dp)
                         )
                     }
                 }

@@ -106,6 +106,7 @@ class UserRepositoryTest {
     fun `insertUser delega al DAO y retorna ID`() = runTest {
         // Given
         val user = User(
+            id = 0, // ID temporal, será reemplazado por el DAO
             email = "new@example.com",
             password = "hashedPassword",
             name = "New User"

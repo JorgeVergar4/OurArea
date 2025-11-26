@@ -31,10 +31,16 @@ android {
             apiKeys.load(FileInputStream(apiKeysFile))
             buildConfigField("String", "MAPS_API_KEY", "\"${apiKeys["MAPS_API_KEY"]}\"")
             manifestPlaceholders["MAPS_API_KEY"] = apiKeys["MAPS_API_KEY"] ?: ""
+
+            // Xano API Configuration
+            buildConfigField("String", "XANO_BASE_URL", "\"${apiKeys.getProperty("XANO_BASE_URL", "")}\"")
+            buildConfigField("String", "XANO_API_KEY", "\"${apiKeys.getProperty("XANO_API_KEY", "")}\"")
         } else {
             // Fallback si no existe el archivo
             buildConfigField("String", "MAPS_API_KEY", "\"\"")
             manifestPlaceholders["MAPS_API_KEY"] = ""
+            buildConfigField("String", "XANO_BASE_URL", "\"\"")
+            buildConfigField("String", "XANO_API_KEY", "\"\"")
         }
     }
 
@@ -129,6 +135,12 @@ dependencies {
 
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Retrofit for Xano API
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

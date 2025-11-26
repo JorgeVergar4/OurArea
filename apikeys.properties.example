@@ -3,6 +3,20 @@
 # 1. Copia este archivo y renómbralo a "apikeys.properties"
 # 2. Reemplaza YOUR_API_KEY_HERE con tu Google Maps API Key real
 # 3. Obtén tu API Key en: https://console.cloud.google.com/apis/credentials
+# 4. Las URLs de Xano ya están configuradas (no necesitas cambiarlas)
 
 # Google Maps API Key
 MAPS_API_KEY=YOUR_API_KEY_HERE
+
+# Xano API Configuration
+# IMPORTANTE: La aplicación usa URLs hardcodeadas en RetrofitClient.kt
+# Las siguientes variables son OPCIONALES y solo se usan si quieres sobrescribir las URLs por defecto
+# URLs configuradas en el código:
+# - Events API: https://x8ki-letl-twmt.n7.xano.io/api:bccGxUx6/
+# - Auth API: https://x8ki-letl-twmt.n7.xano.io/api:VPh1Y7YC/
+
+# Dejalo vacío para usar las URLs por defecto
+XANO_BASE_URL=
+
+# Xano API Key (opcional, solo si usas autenticación por API key adicional)
+XANO_API_KEY=

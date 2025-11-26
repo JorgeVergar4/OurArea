@@ -21,12 +21,20 @@ class EventViewModel(
     val filteredEvents: StateFlow<List<Event>> = _filteredEvents
 
     private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
+    private val _syncStatus = MutableStateFlow<String?>(null)
+    val syncStatus: StateFlow<String?> = _syncStatus
 
     private var allEvents: List<Event> = emptyList()
     private var userLocation: Location? = null
 
     init {
         loadEvents()
+        syncEventsFromXano()
     }
 
     private fun loadEvents() {
@@ -37,6 +45,29 @@ class EventViewModel(
                 updateDistances()
                 _filteredEvents.value = allEvents
                 _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Sincroniza eventos desde Xano API
+     */
+    fun syncEventsFromXano() {
+        viewModelScope.launch {
+            try {
+                _syncStatus.value = "Sincronizando con servidor..."
+                val success = repository.syncEventsFromXano(
+                    latitude = userLocation?.latitude,
+                    longitude = userLocation?.longitude
+                )
+                _syncStatus.value = if (success) {
+                    "Sincronización exitosa"
+                } else {
+                    "Usando datos locales"
+                }
+            } catch (e: Exception) {
+                _syncStatus.value = "Error de conexión"
+                _error.value = "No se pudo conectar con el servidor"
             }
         }
     }
@@ -243,30 +274,118 @@ class EventViewModel(
     }
 
 
-    fun insertEvent(event: Event) {
+    /**
+     * Crea un evento en Xano y guarda localmente
+     * @param event Evento a crear
+     * @param imageFile Archivo de imagen opcional para subir a Xano
+     * @param onSuccess Callback con el evento creado (o null si falla)
+     */
+    fun insertEvent(event: Event, imageFile: File? = null, onSuccess: (Event?) -> Unit = {}) {
         viewModelScope.launch {
-            repository.insertEvent(event)
+            try {
+                _isLoading.value = true
+                _error.value = null
+
+                // Crear evento (intenta Xano primero, si falla guarda localmente)
+                val createdEvent = repository.createEventOnXano(event, imageFile)
+
+                if (createdEvent != null) {
+                    // Verificar si el evento se sincronizó a Xano o es solo local
+                    if (createdEvent.id > 0 && createdEvent.id == event.id) {
+                        // ID autogenerado por Room (solo local)
+                        _syncStatus.value = "⚠️ Evento guardado localmente (sin conexión)"
+                    } else if (createdEvent.id > 0) {
+                        // ID de Xano (sincronizado exitosamente)
+                        _syncStatus.value = "✅ Evento publicado correctamente"
+                        // FORZAR RECARGA desde Xano para obtener el evento actualizado
+                        syncEventsFromXano()
+                    } else {
+                        // ID 0 (autogenerate de Room)
+                        _syncStatus.value = "✅ Evento guardado"
+                    }
+                    onSuccess(createdEvent)
+                } else {
+                    // Error al guardar (ni local ni Xano)
+                    _error.value = "❌ Error al crear evento. Intenta de nuevo."
+                    onSuccess(null)
+                }
+            } catch (e: Exception) {
+                _error.value = "❌ Error: ${e.message}"
+                onSuccess(null)
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
     /**
-     * Elimina un evento y su imagen asociada del almacenamiento interno
+     * Elimina un evento de Xano y localmente
      */
     fun deleteEvent(event: Event, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             try {
-                // Eliminar archivo de imagen si existe y es una ruta local
-                if (event.image.isNotEmpty() && event.image.startsWith("/")) {
-                    deleteEventImage(event.image)
+                _isLoading.value = true
+                _error.value = null
+
+                // PRIMERO: Eliminar de Xano
+                val success = repository.deleteEventFromXano(event.id)
+
+                if (success) {
+                    // Éxito: evento eliminado de Xano y local
+                    _syncStatus.value = "Evento eliminado"
+
+                    // Eliminar archivo de imagen si existe y es una ruta local
+                    if (event.image.isNotEmpty() && event.image.startsWith("/")) {
+                        deleteEventImage(event.image)
+                    }
+
+                    onSuccess()
+                } else {
+                    // Fallback: Eliminar solo localmente
+                    if (event.image.isNotEmpty() && event.image.startsWith("/")) {
+                        deleteEventImage(event.image)
+                    }
+                    repository.deleteEvent(event)
+                    _error.value = "Evento eliminado solo localmente (sin conexión)"
+                    onSuccess()
                 }
-
-                // Eliminar evento de la base de datos
-                repository.deleteEvent(event)
-
-                // Callback de éxito
-                onSuccess()
             } catch (e: Exception) {
-                e.printStackTrace()
+                _error.value = "Error al eliminar evento: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Actualiza un evento en Xano y localmente
+     * @param event Evento a actualizar
+     * @param imageFile Archivo de imagen opcional (solo si cambió la imagen)
+     * @param onSuccess Callback con el evento actualizado (o null si falla)
+     */
+    fun updateEvent(event: Event, imageFile: File? = null, onSuccess: (Event?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                _error.value = null
+
+                // Actualizar en Xano (con nueva imagen si es necesaria)
+                val updatedEvent = repository.updateEventOnXano(event, imageFile)
+
+                if (updatedEvent != null) {
+                    _syncStatus.value = "Evento actualizado exitosamente"
+                    onSuccess(updatedEvent)
+                } else {
+                    // Fallback: Actualizar solo localmente
+                    repository.updateEvent(event)
+                    _error.value = "Evento actualizado solo localmente (sin conexión)"
+                    onSuccess(event)
+                }
+            } catch (e: Exception) {
+                _error.value = "Error al actualizar evento: ${e.message}"
+                onSuccess(null)
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -295,6 +414,20 @@ class EventViewModel(
      */
     fun canDeleteEvent(event: Event, currentUserId: Int): Boolean {
         return event.createdByUserId == currentUserId
+    }
+
+    /**
+     * Limpia mensajes de error
+     */
+    fun clearError() {
+        _error.value = null
+    }
+
+    /**
+     * Limpia mensajes de sincronización
+     */
+    fun clearSyncStatus() {
+        _syncStatus.value = null
     }
 }
 

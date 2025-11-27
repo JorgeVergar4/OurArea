@@ -23,7 +23,9 @@
       "WebFetch(domain:x8ki-letl-twmt.n7.xano.io)",
       "Bash(del \"C:\\Users\\Yoryo\\Desktop\\Base\\OurArea\\our\\test_event.json\")",
       "Bash(./gradlew installDebug:*)",
-      "Bash(adb logcat:*)"
+      "Bash(adb logcat:*)",
+      "Bash(test:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "ask": []

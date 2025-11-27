@@ -217,19 +217,49 @@ fun HomeScreen(
                     )
                 }
 
+                // Optimización: Limitar eventos mostrados en el mapa para mejor rendimiento
+                val eventsToShow = remember(events) {
+                    events.take(50) // Mostrar máximo 50 eventos más cercanos
+                }
+
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
                     cameraPositionState = cameraPositionState,
-                    uiSettings = MapUiSettings(zoomControlsEnabled = false)
+                    properties = MapProperties(
+                        mapType = MapType.NORMAL,
+                        isMyLocationEnabled = false, // Usamos nuestro propio marcador
+                        isTrafficEnabled = false, // Deshabilitar tráfico para mejor rendimiento
+                        isBuildingEnabled = false, // Deshabilitar edificios 3D
+                        isIndoorEnabled = false, // Deshabilitar mapas de interiores
+                        minZoomPreference = 10f,
+                        maxZoomPreference = 18f
+                    ),
+                    uiSettings = MapUiSettings(
+                        zoomControlsEnabled = false,
+                        mapToolbarEnabled = false, // Deshabilitar toolbar
+                        tiltGesturesEnabled = false, // Deshabilitar gestos 3D
+                        myLocationButtonEnabled = false,
+                        compassEnabled = false,
+                        indoorLevelPickerEnabled = false,
+                        zoomGesturesEnabled = true,
+                        scrollGesturesEnabled = true
+                    )
                 ) {
+                    // Marcador de ubicación del usuario
                     Marker(
                         state = rememberMarkerState(position = LatLng(userLocation!!.latitude, userLocation!!.longitude)),
                         title = "Tu ubicación"
                     )
-                    events.forEach { event ->
+
+                    // Marcadores de eventos optimizados
+                    eventsToShow.forEach { event ->
                         Marker(
-                            state = rememberMarkerState(position = LatLng(event.latitude, event.longitude)),
-                            title = event.title
+                            state = rememberMarkerState(
+                                position = LatLng(event.latitude, event.longitude),
+                                key = "marker_${event.id}"
+                            ),
+                            title = event.title,
+                            snippet = event.description.take(50)
                         )
                     }
                 }
